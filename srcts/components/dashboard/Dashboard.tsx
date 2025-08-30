@@ -7,6 +7,7 @@ import { StatsCards } from "./StatsCards";
 import { ChartsSection } from "./ChartsSection";
 import { DataTableSection } from "./DataTableSection";
 import { DateRangeSelector } from "./DateRangeSelector";
+import { FilterControls } from "./FilterControls";
 import { PlotCard } from "../PlotCard";
 
 export function Dashboard() {
@@ -33,6 +34,9 @@ export function Dashboard() {
         </header>
 
         <div className="flex flex-1 flex-col gap-6 p-4 pt-0">
+          {/* Filter Controls */}
+          <FilterControls />
+          
           {/* Date Range Selector and KPI Stats */}
           <div className="grid gap-6 lg:grid-cols-3">
             <DateRangeSelector />

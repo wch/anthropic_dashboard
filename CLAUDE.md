@@ -4,13 +4,20 @@ This file provides comprehensive guidance to Claude Code and other LLM coding ag
 
 ## Project Overview
 
-This is a Shiny-React application created from the hello-world template. Shiny-React is a React bindings library that enables bidirectional communication between React frontend components and Shiny servers (both R and Python), allowing you to build applications with React's frontend reactivity and Shiny's backend reactivity.
+This is a Shiny-React dashboard application for Anthropic API usage analytics. It demonstrates advanced Shiny-React patterns including filtering, grouping, data visualization, and real-time API integration. The application bridges React's frontend reactivity with Shiny's backend reactivity to create a comprehensive analytics dashboard.
+
+**Key Features**:
+- **Anthropic API Integration**: Live usage and cost reporting with fallback to demo data
+- **Advanced Filtering**: Workspace, API Key, Model, and granularity controls
+- **Data Visualization**: Interactive charts and tables using Recharts
+- **Modern UI**: Built with shadcn/ui components and Tailwind CSS
+- **Real-time Updates**: Dynamic filtering with cascading dropdowns
 
 **Key Concept**: The frontend uses React's reactivity, and the backend uses Shiny's reactivity. These are both forms of reactivity, but they have differences from each other. Shiny-React bridges these two reactive systems.
 
 **Architecture**:
 - **Frontend**: React with TypeScript using shiny-react hooks
-- **Backend**: Shiny server (both R and Python versions available)
+- **Backend**: Shiny server (Python)
 - **Communication**: Bidirectional real-time data flow via shiny-react library
 - **Build System**: Dual ESBuild bundling for both CommonJS and ESM compatibility
 
@@ -21,18 +28,28 @@ test/
 ├── package.json            # Build configuration and npm dependencies
 ├── tsconfig.json           # TypeScript configuration
 ├── CLAUDE.md               # This file - instructions for LLM coding agents
+├── anthropic-docs/         # Anthropic API documentation
+│   ├── INDEX.md            # **API DOCUMENTATION INDEX - START HERE**
+│   ├── get-messages-usage-report.md  # Usage reporting API
+│   ├── get-cost-report.md  # Cost reporting API
+│   ├── list-workspaces.md  # Workspace management
+│   ├── list-api-keys.md    # API key management
+│   └── [other API docs]    # Additional API documentation
 ├── srcts/                  # React TypeScript source code
 │   ├── main.tsx            # React app entry point
-│   ├── HelloWorldComponent.tsx  # Main component using shiny-react hooks
+│   ├── components/         # React components
+│   │   ├── App.tsx         # Main application component
+│   │   ├── dashboard/      # Dashboard-specific components
+│   │   │   ├── Dashboard.tsx        # Main dashboard layout
+│   │   │   ├── FilterControls.tsx   # Advanced filtering interface
+│   │   │   ├── ChartsSection.tsx    # Data visualization charts
+│   │   │   ├── DataTableSection.tsx # Usage/cost data tables
+│   │   │   ├── StatsCards.tsx       # KPI statistics cards
+│   │   │   └── DateRangeSelector.tsx # Date range controls
+│   │   └── ui/             # shadcn/ui components
 │   └── styles.css          # CSS styling
-├── r/                      # R Shiny backend
-│   ├── app.R               # Main R Shiny application
-│   ├── shinyreact.R        # R functions for shiny-react
-│   └── www/                # Built JavaScript/CSS output (auto-generated)
-│       ├── main.js         # Compiled React code for R backend
-│       └── main.css        # Compiled CSS for R backend
 └── py/                     # Python Shiny backend
-    ├── app.py              # Main Python Shiny application
+    ├── app.py              # Main Python Shiny application with API integration
     ├── shinyreact.py       # Python functions for shiny-react
     └── www/                # Built JavaScript/CSS output (auto-generated)
         ├── main.js         # Compiled React code for Python backend
@@ -41,15 +58,36 @@ test/
 
 ## Key Files and Their Purpose
 
+### **🔍 IMPORTANT: Start with API Documentation**
+- **`anthropic-docs/INDEX.md`**: **COMPREHENSIVE API REFERENCE INDEX**
+  - Quick lookup for all Anthropic API endpoints
+  - Usage patterns for dashboard integration
+  - Authentication and filtering parameters
+  - **READ THIS FIRST** when working with API integrations
+
 ### Frontend (React/TypeScript)
 - **`srcts/main.tsx`**: Entry point that mounts the React app to the DOM
-- **`srcts/HelloWorldComponent.tsx`**: Main component demonstrating shiny-react hooks
-- **`srcts/styles.css`**: Application styling
+- **`srcts/components/App.tsx`**: Main application component with dashboard layout
+- **`srcts/components/dashboard/`**: Dashboard-specific components:
+  - **`FilterControls.tsx`**: Advanced filtering interface (workspace, API key, model, granularity)
+  - **`ChartsSection.tsx`**: Data visualization using Recharts (token usage, cost analysis)
+  - **`DataTableSection.tsx`**: Tabular data display with sorting and filtering
+  - **`StatsCards.tsx`**: KPI metrics and statistics display
+  - **`DateRangeSelector.tsx`**: Date range picker with presets
+- **`srcts/components/ui/`**: shadcn/ui component library (buttons, cards, tables, etc.)
 
-### Backend (Shiny)
-- **`r/app.R`** or **`py/app.py`**: Main Shiny server application
-- **`r/shinyreact.R`** or **`py/shinyreact.py`**: Utility functions for bare page setup and custom renderers
-- **`r/www/`** or **`py/www/`**: Auto-generated build output (JavaScript and CSS bundles)
+### Backend (Python Shiny)
+- **`py/app.py`**: Main Python Shiny application with Anthropic API integration
+  - Live API data fetching with fallback to demo data
+  - Advanced filtering and grouping logic
+  - Real-time reactive calculations
+- **`py/shinyreact.py`**: Utility functions for bare page setup and custom renderers
+- **`py/www/`**: Auto-generated build output (JavaScript and CSS bundles)
+
+### Configuration & Documentation
+- **`package.json`**: Build scripts, dependencies, and project configuration
+- **`tsconfig.json`**: TypeScript configuration with path aliases for components
+- **`components.json`**: shadcn/ui configuration for component management
 
 ## Build Commands
 
@@ -58,26 +96,11 @@ test/
 # Install dependencies
 npm install
 
-# Development with hot reload (builds for both R and Python)
+# Development with hot reload
 npm run watch
 
-# One-time build (builds for both R and Python)
+# One-time build
 npm run build
-```
-
-### Individual Backend Builds
-```bash
-# Build only for R backend
-npm run build-r
-
-# Build only for Python backend
-npm run build-py
-
-# Watch mode for R backend only
-npm run watch-r
-
-# Watch mode for Python backend only
-npm run watch-py
 ```
 
 ## Running the Application
@@ -88,16 +111,60 @@ npm run watch-py
    npm run watch
    ```
 
-2. **Run Shiny server** (in another terminal):
+2. **Run Python Shiny server** (in another terminal):
    ```bash
-   # For R backend
-   R -e "options(shiny.autoreload = TRUE); shiny::runApp('r/app.R', port=8000)"
-
-   # For Python backend
    shiny run py/app.py --port 8000
    ```
 
 3. **Open browser**: Navigate to `http://localhost:8000`
+
+## Anthropic API Integration
+
+This application integrates with the Anthropic Admin API to provide real-time usage and cost analytics. 
+
+### **📖 API Documentation Reference**
+- **Primary Reference**: See `anthropic-docs/INDEX.md` for complete API documentation index
+- **Key Endpoints**: 
+  - `get-messages-usage-report.md` - Usage statistics with filtering
+  - `get-cost-report.md` - Cost analysis and billing data
+  - `list-workspaces.md` - Workspace management
+  - `list-api-keys.md` - API key management
+
+### API Configuration
+```python
+# Required environment variables
+ANTHROPIC_ADMIN_KEY=your_admin_api_key_here
+
+# API configuration in py/app.py
+ANTHROPIC_API_BASE = "https://api.anthropic.com"
+ANTHROPIC_VERSION = "2023-06-01"
+```
+
+### Data Flow Architecture
+```
+FilterControls ──[filters]──> Python Backend ──[API calls]──> Anthropic API
+     │                              │                              │
+     ▼                              ▼                              ▼
+ User selects:              Applies filters:              Returns data:
+ - Workspace                - workspace_id                - Usage stats
+ - API Key                  - api_key_id                  - Cost data  
+ - Model                    - model filter                - Grouped by filters
+ - Granularity              - bucket_width                - Time-bucketed
+     │                              │                              │
+     ▼                              ▼                              ▼
+Dashboard Updates ◀─[processed data]─◀ Data Processing ◀─[raw JSON]─◀
+```
+
+### Filtering System
+The dashboard implements cascading filters that mirror the API's grouping capabilities:
+
+1. **Workspace Filter**: Filters all data by workspace_id
+2. **API Key Filter**: Dynamically updates based on selected workspace  
+3. **Model Filter**: Filters by specific model names
+4. **Granularity**: Controls time bucket width (1h, 1d, 7d, 30d)
+
+### Demo Data Fallback
+When `ANTHROPIC_ADMIN_KEY` is not available, the application automatically generates realistic demo data that matches the API response structure, allowing development and testing without API access.
 
 ## How Shiny-React Works
 
@@ -142,15 +209,6 @@ function MyComponent() {
 }
 ```
 
-#### R Shiny Server Pattern
-```r
-server <- function(input, output, session) {
-  output$my_output <- renderText({
-    toupper(input$my_input)  # Transform the input
-  })
-}
-```
-
 #### Python Shiny Server Pattern
 ```python
 def server(input, output, session):
@@ -173,7 +231,6 @@ def server(input, output, session):
 4. **Update styling** in `styles.css` if needed
 
 ### Modifying Backend Logic
-- **R**: Edit `r/app.R` for server logic, `r/shinyreact.R` for utilities
 - **Python**: Edit `py/app.py` for server logic, `py/shinyreact.py` for utilities
 - **No rebuild needed** for backend changes (Shiny auto-reloads if configured)
 
@@ -181,7 +238,7 @@ def server(input, output, session):
 
 ### Build System
 - **ESBuild**: Bundles React TypeScript code into JavaScript
-- **Dual Output**: Creates separate bundles for R (`r/www/`) and Python (`py/www/`) backends
+- **Build Output**: Creates JavaScript bundle for Python backend (`py/www/`)
 - **CSS Bundling**: Automatically includes CSS in JavaScript bundles
 - **TypeScript Compilation**: Provides type checking during development
 
@@ -203,17 +260,13 @@ def server(input, output, session):
 
 ### Development Tips
 - **Use browser DevTools**: Check console for React/JavaScript errors
-- **Monitor Shiny logs**: Watch R/Python console for server-side errors
+- **Monitor Shiny logs**: Watch Python console for server-side errors
 - **Verify IDs match**: Input/output IDs must be identical in React and Shiny code
 - **Check network tab**: Verify WebSocket communication between client and server
 
 ### Port Conflicts
 If port 8000 is in use, change the port:
 ```bash
-# R
-R -e "shiny::runApp('r/app.R', port=8001)"
-
-# Python
 shiny run py/app.py --port 8001
 ```
 
@@ -227,7 +280,6 @@ shiny run py/app.py --port 8001
 - **`.tsx`**: React components with JSX
 - **`.ts`**: TypeScript utility files
 - **`.css`**: Styling files
-- **`.R`**: R Shiny server files
 - **`.py`**: Python Shiny server files
 
 ## Key Dependencies
@@ -403,14 +455,6 @@ function PlotCard() {
 ```
 
 **Backend Requirements**:
-```r
-# R - Use renderPlot
-output$plot1 <- renderPlot({
-  # Your plotting code here
-  plot(mtcars$wt, mtcars$mpg)
-})
-```
-
 ```python
 # Python - Use render.plot
 @render.plot()
@@ -562,22 +606,6 @@ function DataTableCard() {
 
 **Server-Side Data Frame Handling**:
 
-*R Backend*:
-```r
-# Data frames are automatically converted to column-major JSON
-output$table_data <- renderObject({
-  req(input$table_rows)
-  # This will be converted to a JSON object in column-major format, as in:
-  # {
-  #   "mpg": [21, 21, 22.8, ...],
-  #   "cyl": [6, 6, 4, ...],
-  #   "disp": [160, 160, 108, ...],
-  #   ...
-  # }
-  mtcars[seq_len(input$table_rows), ]
-})
-```
-
 *Python Backend*:
 ```python
 @render_object()
@@ -594,34 +622,6 @@ def table_data():
 ```
 
 ### Custom Renderers for Complex Data
-
-**R Backend - Custom renderObject**:
-```r
-# In shinyreact.R
-renderObject <- function(expr, env = parent.frame(), quoted = FALSE, outputArgs = list()) {
-  func <- installExprFunction(expr, "func", env, quoted, label = "renderObject")
-  createRenderFunction(
-    func,
-    function(value, session, name, ...) {
-      value  # Return raw data as JSON
-    },
-    function(...) { stop("Not implemented") },
-    outputArgs
-  )
-}
-
-# In app.R
-output$table_stats <- renderObject({
-  mtcars_subset <- mtcars[seq_len(input$table_rows), ]
-  list(
-    colname = "mpg",
-    mean = mean(mtcars_subset$mpg),
-    median = median(mtcars_subset$mpg),
-    min = min(mtcars_subset$mpg),
-    max = max(mtcars_subset$mpg)
-  )
-})
-```
 
 **Python Backend - Custom render_object**:
 ```python
@@ -855,18 +855,6 @@ function EventButton() {
 ```
 
 **Server-side button handling**:
-```r
-# R - Track button clicks by counting non-null values
-num_button_clicks <- 0
-output$click_count <- renderText({
-  if (is.null(input$button_input)) {
-    return(0)
-  }
-  num_button_clicks <<- num_button_clicks + 1
-  num_button_clicks
-})
-```
-
 ```python
 # Python - Track button clicks
 num_button_clicks = 0
@@ -945,24 +933,6 @@ function App() {
 
 ### Server-Side Message Sending
 
-**R Shiny**:
-```r
-server <- function(input, output, session) {
-  # Send single message
-  session$sendCustomMessage("logEvent", list(
-    message = "User logged in",
-    type = "info"
-  ))
-
-  # Send periodic messages
-  observe({
-    invalidateLater(2000)  # Every 2 seconds
-    log_event <- list(message = "Server update", type = "info")
-    session$sendCustomMessage("logEvent", log_event)
-  })
-}
-```
-
 **Python Shiny**:
 ```python
 def server(input: Inputs, output: Outputs, session: Session):
@@ -991,70 +961,6 @@ def server(input: Inputs, output: Outputs, session: Session):
 **Note**: Custom messages are server→client only and bypass the normal input/output reactive system.
 
 ## Backend Patterns and Best Practices
-
-### R Shiny Patterns
-
-**Basic Server Structure**:
-```r
-library(shiny)
-source("shinyreact.R", local = TRUE)
-
-# UI with bare page (no default Shiny styling)
-ui <- barePage(
-  title = "My Shiny React App",
-  tags$head(
-    tags$script(src = "main.js", type = "module"),
-    tags$link(href = "main.css", rel = "stylesheet")
-  ),
-  tags$div(id = "root")  # React mount point
-)
-
-server <- function(input, output, session) {
-  # Text output - simple transformation
-  output$txtout <- renderText({
-    toupper(input$txtin)
-  })
-
-  # Complex data output using renderObject
-  output$table_data <- renderObject({
-    req(input$table_rows)  # Ensure input exists
-    mtcars[seq_len(input$table_rows), ]
-  })
-
-  # Plot output
-  output$plot1 <- renderPlot({
-    req(input$table_rows)
-    plot(mtcars$wt[1:input$table_rows], mtcars$mpg[1:input$table_rows])
-  })
-}
-
-shinyApp(ui = ui, server = server)
-```
-
-**R Utility Functions (shinyreact.R)**:
-```r
-# Bare page without default Shiny styling
-barePage <- function(..., title = NULL, lang = NULL) {
-  ui <- list(
-    shiny:::jqueryDependency(),
-    if (!is.null(title)) tags$head(tags$title(title)),
-    ...
-  )
-  attr(ui, "lang") <- lang
-  ui
-}
-
-# Custom renderer for arbitrary JSON data
-renderObject <- function(expr, env = parent.frame(), quoted = FALSE, outputArgs = list()) {
-  func <- installExprFunction(expr, "func", env, quoted, label = "renderObject")
-  createRenderFunction(
-    func,
-    function(value, session, name, ...) { value },
-    function(...) { stop("Not implemented") },
-    outputArgs
-  )
-}
-```
 
 ### Python Shiny Patterns
 
@@ -1246,11 +1152,9 @@ npm run build
 curl http://localhost:8000
 
 # Check Shiny logs for errors
-# R: Look at R console output
 # Python: Look at terminal where shiny run is executed
 
 # Try different port if 8000 is in use
-R -e "shiny::runApp('r/app.R', port=8001)"
 shiny run py/app.py --port 8001
 ```
 
@@ -1301,25 +1205,6 @@ import { useShinyInput, useShinyOutput, ImageOutput } from "shiny-react";
 ```
 
 ### Server-Side Debugging
-
-**R Debugging**:
-```r
-# Add debug prints
-server <- function(input, output, session) {
-  output$my_output <- renderText({
-    cat("Input value:", input$my_input, "\n")  # Debug print
-    result <- toupper(input$my_input)
-    cat("Output value:", result, "\n")
-    result
-  })
-}
-
-# Use req() to handle missing inputs
-output$my_output <- renderText({
-  req(input$my_input)  # Wait until input is available
-  toupper(input$my_input)
-})
-```
 
 **Python Debugging**:
 ```python
@@ -1515,72 +1400,6 @@ const processImageFiles = (files: File[]) => {
 ```
 
 ### Backend Integration Patterns
-
-**R Backend with ellmer (LLM Integration)**:
-```r
-library(ellmer)
-
-# Initialize AI chat client
-chat <- tryCatch({
-  chat_openai(
-    "You are a helpful AI assistant. Be concise but informative in your responses.",
-    model = "gpt-4o-mini"
-  )
-}, error = function(e) {
-  message("Could not initialize OpenAI chat: ", e$message)
-  NULL
-})
-
-server <- function(input, output, session) {
-  # Handle incoming chat messages with structured data
-  observeEvent(input$chat_input, {
-    chat_data <- input$chat_input
-    user_message <- trimws(chat_data$text)
-    attachments <- chat_data$attachments
-
-    if (nchar(user_message) > 0) {
-      # Process message with AI
-      if (!is.null(chat)) {
-        tryCatch({
-          # Handle text and image attachments
-          if (length(attachments) > 0) {
-            # Process multi-modal input
-            content_parts <- list(list(type = "text", text = user_message))
-            for (attachment in attachments) {
-              content_parts <- append(content_parts, list(list(
-                type = "image_url",
-                image_url = list(url = paste0("data:", attachment$type, ";base64,", attachment$content))
-              )))
-            }
-            ai_response <- chat$chat(content_parts)
-          } else {
-            # Text-only message
-            ai_response <- chat$chat(user_message)
-          }
-
-          # Send response via custom message for streaming
-          session$sendCustomMessage("chat_stream", list(
-            chunk = ai_response,
-            done = TRUE
-          ))
-        }, error = function(e) {
-          session$sendCustomMessage("chat_stream", list(
-            chunk = paste("Error:", e$message),
-            done = TRUE
-          ))
-        })
-      } else {
-        # Demo response when no API available
-        demo_response <- paste("Demo response to:", user_message)
-        session$sendCustomMessage("chat_stream", list(
-          chunk = demo_response,
-          done = TRUE
-        ))
-      }
-    }
-  })
-}
-```
 
 **Python Backend with chatlas (LLM Integration)**:
 ```python

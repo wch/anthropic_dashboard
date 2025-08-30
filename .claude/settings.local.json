@@ -10,11 +10,12 @@
       "Bash(npx:*)",
       "Bash(npm install:*)",
       "Bash(npm run build:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(grep:*)"
     ]
   },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "shadcn"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }

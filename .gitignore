@@ -3,3 +3,4 @@ r/www/
 py/www/
 .env
 __pycache__/
+.claude/settings.local.json
