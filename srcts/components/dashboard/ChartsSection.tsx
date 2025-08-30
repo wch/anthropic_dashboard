@@ -1,195 +1,156 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useShinyOutput } from "shiny-react";
-import { Bar, BarChart, Line, LineChart, Pie, PieChart, Cell, CartesianGrid, XAxis, YAxis, ResponsiveContainer } from "recharts";
-import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { Bar, BarChart, Line, LineChart, Pie, PieChart, Cell, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend } from "recharts";
 
-interface MonthlyData {
-  month: string;
-  desktop: number;
-  mobile: number;
-  revenue: number;
-}
-
-interface TrendData {
+interface TokenUsageData {
   date: string;
-  users: number;
-  revenue: number;
+  input_tokens: number;
+  output_tokens: number;
 }
 
-interface CategoryData {
-  category: string;
-  score: number;
-  count: number;
+interface CostByModelData {
+  model: string;
+  cost: number;
 }
 
-const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
+interface ServiceTierData {
+  service_tier: string;
+  tokens: number;
+}
+
+const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8", "#82CA9D"];
 
 export function ChartsSection() {
-  // Connect to Shiny outputs for chart data (they come as column-major objects)
-  const [monthlyDataRaw] = useShinyOutput<any>("monthly_chart_data", {});
-  const [trendDataRaw] = useShinyOutput<any>("trend_chart_data", {});
-  const [categoryDataRaw] = useShinyOutput<any>("category_chart_data", {});
+  // Connect to Shiny outputs for Anthropic API chart data
+  const [tokenUsageDataRaw] = useShinyOutput<any>("token_usage_chart_data", {});
+  const [costByModelDataRaw] = useShinyOutput<any>("cost_by_model_chart_data", {});
+  const [serviceTierDataRaw] = useShinyOutput<any>("service_tier_chart_data", {});
 
   // Debug logging
-  console.log("Monthly Data Raw:", monthlyDataRaw);
-  console.log("Trend Data Raw:", trendDataRaw);
-  console.log("Category Data Raw:", categoryDataRaw);
+  console.log("Token Usage Data Raw:", tokenUsageDataRaw);
+  console.log("Cost By Model Data Raw:", costByModelDataRaw);
+  console.log("Service Tier Data Raw:", serviceTierDataRaw);
 
   // Convert column-major data to row-major arrays for recharts
-  const monthlyData: MonthlyData[] = React.useMemo(() => {
-    if (!monthlyDataRaw || typeof monthlyDataRaw !== 'object' || !monthlyDataRaw.month) return [];
+  const tokenUsageData: TokenUsageData[] = React.useMemo(() => {
+    if (!tokenUsageDataRaw || typeof tokenUsageDataRaw !== 'object' || !tokenUsageDataRaw.date) return [];
     
-    const length = monthlyDataRaw.month.length || 0;
+    const length = tokenUsageDataRaw.date.length || 0;
     return Array.from({ length }, (_, i) => ({
-      month: monthlyDataRaw.month[i],
-      desktop: monthlyDataRaw.desktop[i],
-      mobile: monthlyDataRaw.mobile[i],
-      revenue: monthlyDataRaw.revenue[i]
+      date: tokenUsageDataRaw.date[i],
+      input_tokens: tokenUsageDataRaw.input_tokens[i] || 0,
+      output_tokens: tokenUsageDataRaw.output_tokens[i] || 0
     }));
-  }, [monthlyDataRaw]);
+  }, [tokenUsageDataRaw]);
 
-  const trendData: TrendData[] = React.useMemo(() => {
-    if (!trendDataRaw || typeof trendDataRaw !== 'object' || !trendDataRaw.date) return [];
+  const costByModelData: CostByModelData[] = React.useMemo(() => {
+    if (!costByModelDataRaw || typeof costByModelDataRaw !== 'object' || !costByModelDataRaw.model) return [];
     
-    const length = trendDataRaw.date.length || 0;
+    const length = costByModelDataRaw.model.length || 0;
     return Array.from({ length }, (_, i) => ({
-      date: trendDataRaw.date[i],
-      users: trendDataRaw.users[i],
-      revenue: trendDataRaw.revenue[i]
+      model: costByModelDataRaw.model[i]?.replace('claude-', '') || 'Unknown',
+      cost: costByModelDataRaw.cost[i] || 0
     }));
-  }, [trendDataRaw]);
+  }, [costByModelDataRaw]);
 
-  const categoryData: CategoryData[] = React.useMemo(() => {
-    if (!categoryDataRaw || typeof categoryDataRaw !== 'object' || !categoryDataRaw.category) return [];
+  const serviceTierData: ServiceTierData[] = React.useMemo(() => {
+    if (!serviceTierDataRaw || typeof serviceTierDataRaw !== 'object' || !serviceTierDataRaw.service_tier) return [];
     
-    const length = categoryDataRaw.category.length || 0;
+    const length = serviceTierDataRaw.service_tier.length || 0;
     return Array.from({ length }, (_, i) => ({
-      category: categoryDataRaw.category[i],
-      score: categoryDataRaw.score[i],
-      count: categoryDataRaw.count[i]
+      service_tier: serviceTierDataRaw.service_tier[i] || 'standard',
+      tokens: serviceTierDataRaw.tokens[i] || 0
     }));
-  }, [categoryDataRaw]);
+  }, [serviceTierDataRaw]);
 
-  console.log("Processed Monthly Data:", monthlyData);
-  console.log("Processed Trend Data:", trendData);
-  console.log("Processed Category Data:", categoryData);
+  console.log("Processed Token Usage Data:", tokenUsageData);
+  console.log("Processed Cost By Model Data:", costByModelData);
+  console.log("Processed Service Tier Data:", serviceTierData);
 
-  // Chart configurations for shadcn/ui charts
-  const barChartConfig = {
-    desktop: {
-      label: "Desktop",
-      color: "#2563eb",
-    },
-    mobile: {
-      label: "Mobile", 
-      color: "#60a5fa",
-    },
-  } satisfies ChartConfig;
-
-  const lineChartConfig = {
-    users: {
-      label: "Users",
-      color: "#8884d8",
-    },
-    revenue: {
-      label: "Revenue",
-      color: "#82ca9d",
-    },
-  } satisfies ChartConfig;
-
-  const pieChartConfig = {
-    A: {
-      label: "Category A",
-      color: COLORS[0],
-    },
-    B: {
-      label: "Category B", 
-      color: COLORS[1],
-    },
-    C: {
-      label: "Category C",
-      color: COLORS[2],
-    },
-  } satisfies ChartConfig;
-
-  // Prepare pie chart data
-  const pieData = categoryData.map((item, index) => ({
-    name: `Category ${item.category}`,
-    value: item.count,
+  // Prepare pie chart data for service tiers
+  const serviceTierPieData = serviceTierData.map((item, index) => ({
+    name: `${item.service_tier} tier`,
+    value: item.tokens,
     fill: COLORS[index % COLORS.length]
   }));
 
   return (
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-      {/* Monthly Revenue Bar Chart */}
-      <Card className="lg:col-span-2">
-        <CardHeader>
-          <CardTitle>Monthly Performance</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={monthlyData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" />
-              <YAxis />
-              <Bar dataKey="desktop" fill="#2563eb" />
-              <Bar dataKey="mobile" fill="#60a5fa" />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      {/* Category Distribution Pie Chart */}
+    <div className="grid gap-6">
+      {/* Token Usage Over Time Line Chart */}
       <Card>
         <CardHeader>
-          <CardTitle>Category Distribution</CardTitle>
+          <CardTitle>Token Usage Over Time</CardTitle>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
-              <Pie
-                data={pieData}
-                cx="50%"
-                cy="50%"
-                outerRadius={80}
-                fill="#8884d8"
-                dataKey="value"
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-              >
-                {pieData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.fill} />
-                ))}
-              </Pie>
-            </PieChart>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={tokenUsageData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis 
+                dataKey="date" 
+                tickFormatter={(value) => {
+                  try {
+                    return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                  } catch {
+                    return value;
+                  }
+                }}
+              />
+              <YAxis tickFormatter={(value) => value.toLocaleString()} />
+              <Tooltip 
+                labelFormatter={(value) => new Date(value).toLocaleDateString()}
+                formatter={(value: any, name) => [value.toLocaleString(), name]}
+              />
+              <Line 
+                type="monotone" 
+                dataKey="input_tokens" 
+                stroke="#2563eb" 
+                strokeWidth={2}
+                name="Input Tokens"
+                animationDuration={300}
+              />
+              <Line 
+                type="monotone" 
+                dataKey="output_tokens" 
+                stroke="#dc2626" 
+                strokeWidth={2}
+                name="Output Tokens"
+                animationDuration={300}
+              />
+            </LineChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>
 
-      {/* User Growth Trend Line Chart */}
-      <Card className="lg:col-span-3">
+      {/* Cost by Model Bar Chart */}
+      <Card>
         <CardHeader>
-          <CardTitle>Growth Trends</CardTitle>
+          <CardTitle>Cost Breakdown by Model</CardTitle>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={trendData}>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={costByModelData}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
-              <Line 
-                type="monotone" 
-                dataKey="users" 
-                stroke="#8884d8" 
-                strokeWidth={2}
+              <XAxis 
+                dataKey="model" 
+                angle={-45}
+                textAnchor="end"
+                height={80}
               />
-              <Line 
-                type="monotone" 
-                dataKey="revenue" 
-                stroke="#82ca9d" 
-                strokeWidth={2}
+              <YAxis 
+                tickFormatter={(value) => `$${value.toFixed(2)}`}
               />
-            </LineChart>
+              <Tooltip 
+                formatter={(value: any) => [`$${value.toFixed(4)}`, "Cost"]}
+                labelFormatter={(label) => `Model: ${label}`}
+              />
+              <Bar 
+                dataKey="cost" 
+                fill="#16a34a"
+                radius={[4, 4, 0, 0]}
+                animationDuration={300}
+              />
+            </BarChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>

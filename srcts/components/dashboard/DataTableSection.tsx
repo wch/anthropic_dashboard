@@ -2,45 +2,82 @@ import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useShinyOutput } from "shiny-react";
 
-interface SampleData {
-  id: number;
-  age: number;
-  score: number;
-  category: string;
+interface UsageData {
+  date: string;
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  service_tier: string;
+}
+
+interface CostData {
+  date: string;
+  description: string;
+  amount: number;
+  model: string;
 }
 
 export function DataTableSection() {
-  // Connect to existing Shiny output for table data
-  const [tableData] = useShinyOutput<Record<string, any[]> | undefined>("table_data", undefined);
+  // Connect to Shiny outputs for usage and cost table data
+  const [usageTableDataRaw] = useShinyOutput<Record<string, any[]> | undefined>("usage_table_data", undefined);
+  const [costTableDataRaw] = useShinyOutput<Record<string, any[]> | undefined>("cost_table_data", undefined);
 
-  // Convert column-major data to row-major for display
-  const processTableData = (): SampleData[] => {
-    if (!tableData) return [];
+  // Convert column-major data to row-major for usage data
+  const processUsageData = (): UsageData[] => {
+    if (!usageTableDataRaw) return [];
     
-    const columnNames = Object.keys(tableData);
-    const numRows = columnNames.length > 0 ? tableData[columnNames[0]].length : 0;
+    const columnNames = Object.keys(usageTableDataRaw);
+    const numRows = columnNames.length > 0 ? usageTableDataRaw[columnNames[0]].length : 0;
 
     return Array.from({ length: numRows }, (_, rowIndex) => {
       const row: any = {};
       columnNames.forEach(colName => {
-        row[colName] = tableData[colName][rowIndex];
+        row[colName] = usageTableDataRaw[colName][rowIndex];
       });
-      return row as SampleData;
+      return row as UsageData;
     });
   };
 
-  const rows = processTableData();
+  // Convert column-major data to row-major for cost data
+  const processCostData = (): CostData[] => {
+    if (!costTableDataRaw) return [];
+    
+    const columnNames = Object.keys(costTableDataRaw);
+    const numRows = columnNames.length > 0 ? costTableDataRaw[columnNames[0]].length : 0;
 
-  const getCategoryColor = (category: string) => {
-    switch (category) {
-      case "A":
-        return "bg-blue-100 text-blue-800 hover:bg-blue-200";
-      case "B":
-        return "bg-green-100 text-green-800 hover:bg-green-200";
-      case "C":
+    return Array.from({ length: numRows }, (_, rowIndex) => {
+      const row: any = {};
+      columnNames.forEach(colName => {
+        row[colName] = costTableDataRaw[colName][rowIndex];
+      });
+      return row as CostData;
+    });
+  };
+
+  const usageRows = processUsageData();
+  const costRows = processCostData();
+
+  const getModelColor = (model: string) => {
+    if (model.includes('sonnet')) {
+      return "bg-purple-100 text-purple-800 hover:bg-purple-200";
+    } else if (model.includes('haiku')) {
+      return "bg-green-100 text-green-800 hover:bg-green-200";
+    } else if (model.includes('opus')) {
+      return "bg-blue-100 text-blue-800 hover:bg-blue-200";
+    } else {
+      return "bg-gray-100 text-gray-800 hover:bg-gray-200";
+    }
+  };
+
+  const getTierColor = (tier: string) => {
+    switch (tier) {
+      case "batch":
         return "bg-orange-100 text-orange-800 hover:bg-orange-200";
+      case "standard":
+        return "bg-blue-100 text-blue-800 hover:bg-blue-200";
       default:
         return "bg-gray-100 text-gray-800 hover:bg-gray-200";
     }
@@ -49,47 +86,105 @@ export function DataTableSection() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Sample Data Table</CardTitle>
+        <CardTitle>API Usage & Cost Details</CardTitle>
       </CardHeader>
       <CardContent>
-        {rows.length > 0 ? (
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-16">ID</TableHead>
-                  <TableHead>Age</TableHead>
-                  <TableHead>Score</TableHead>
-                  <TableHead>Category</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="font-medium">{row.id}</TableCell>
-                    <TableCell>{row.age}</TableCell>
-                    <TableCell>
-                      <span className="font-mono">
-                        {typeof row.score === "number"
-                          ? row.score.toFixed(1)
-                          : row.score}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getCategoryColor(row.category)}>
-                        Category {row.category}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        ) : (
-          <div className="text-center text-muted-foreground py-8">
-            Loading table data...
-          </div>
-        )}
+        <Tabs defaultValue="usage" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="usage">Token Usage</TabsTrigger>
+            <TabsTrigger value="cost">Cost Breakdown</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="usage">
+            {usageRows.length > 0 ? (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Model</TableHead>
+                      <TableHead>Input Tokens</TableHead>
+                      <TableHead>Output Tokens</TableHead>
+                      <TableHead>Total Tokens</TableHead>
+                      <TableHead>Service Tier</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {usageRows.map((row, index) => (
+                      <TableRow key={`${row.date}-${row.model}-${index}`}>
+                        <TableCell className="font-medium">
+                          {new Date(row.date).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getModelColor(row.model)}>
+                            {row.model.replace('claude-', '')}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-mono text-right">
+                          {row.input_tokens.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="font-mono text-right">
+                          {row.output_tokens.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="font-mono text-right font-semibold">
+                          {(row.input_tokens + row.output_tokens).toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getTierColor(row.service_tier)}>
+                            {row.service_tier}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="text-center text-muted-foreground py-8">
+                Loading usage data...
+              </div>
+            )}
+          </TabsContent>
+          
+          <TabsContent value="cost">
+            {costRows.length > 0 ? (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Model</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {costRows.map((row, index) => (
+                      <TableRow key={`${row.date}-${row.description}-${index}`}>
+                        <TableCell className="font-medium">
+                          {new Date(row.date).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>{row.description}</TableCell>
+                        <TableCell>
+                          <Badge className={getModelColor(row.model)}>
+                            {row.model.replace('claude-', '')}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-mono text-right font-semibold">
+                          ${row.amount.toFixed(4)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="text-center text-muted-foreground py-8">
+                Loading cost data...
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );

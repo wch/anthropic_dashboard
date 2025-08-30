@@ -2,14 +2,14 @@ import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useShinyOutput } from "shiny-react";
-import { TrendingUp, Users, DollarSign, Activity } from "lucide-react";
+import { TrendingUp, Zap, DollarSign, Activity, Cpu } from "lucide-react";
 
 export function StatsCards() {
-  // Connect to Shiny outputs for KPI data
-  const [totalUsers] = useShinyOutput<string>("total_users", "0");
-  const [totalRevenue] = useShinyOutput<string>("total_revenue", "0");
-  const [activeSessions] = useShinyOutput<string>("active_sessions", "0");
-  const [conversionRate] = useShinyOutput<string>("conversion_rate", "0");
+  // Connect to Shiny outputs for Anthropic API KPI data
+  const [totalTokens] = useShinyOutput<string>("total_tokens", "0");
+  const [totalCost] = useShinyOutput<string>("total_cost", "$0.00");
+  const [activeModels] = useShinyOutput<string>("active_models", "0");
+  const [apiCalls] = useShinyOutput<string>("api_calls", "0");
 
   // Format numbers for display
   const formatNumber = (value: string | undefined) => {
@@ -21,41 +21,38 @@ export function StatsCards() {
     return num.toLocaleString();
   };
 
-  const formatCurrency = (value: string | undefined) => {
-    if (!value) return "$0";
-    const num = parseFloat(value);
-    if (isNaN(num)) return "$0";
-    return `$${formatNumber(value)}`;
-  };
-
   const stats = [
     {
-      title: "Total Users",
-      value: formatNumber(totalUsers),
-      change: "+12.5%",
-      icon: Users,
+      title: "Total Tokens",
+      value: formatNumber(totalTokens),
+      change: "+15.2%",
+      icon: Zap,
       trend: "up" as const,
+      description: "Input + Output tokens"
     },
     {
-      title: "Revenue",
-      value: formatCurrency(totalRevenue),
-      change: "+8.2%",
+      title: "Total Cost",
+      value: totalCost && totalCost.startsWith("$") ? totalCost : `$${totalCost || "0.00"}`,
+      change: "+8.7%",
       icon: DollarSign,
       trend: "up" as const,
+      description: "Current period spending"
     },
     {
-      title: "Active Sessions",
-      value: formatNumber(activeSessions),
-      change: "+3.1%",
+      title: "Active Models",
+      value: activeModels,
+      change: "+2",
+      icon: Cpu,
+      trend: "up" as const,
+      description: "Models in use"
+    },
+    {
+      title: "API Calls",
+      value: formatNumber(apiCalls),
+      change: "+12.3%",
       icon: Activity,
       trend: "up" as const,
-    },
-    {
-      title: "Conversion Rate",
-      value: `${conversionRate}%`,
-      change: "+0.8%",
-      icon: TrendingUp,
-      trend: "up" as const,
+      description: "Total requests made"
     },
   ];
 
@@ -82,7 +79,7 @@ export function StatsCards() {
                 >
                   {stat.change}
                 </Badge>
-                <span className="text-muted-foreground">from last month</span>
+                <span className="text-muted-foreground">from last period</span>
               </div>
             </CardContent>
           </Card>

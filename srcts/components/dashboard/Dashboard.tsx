@@ -6,8 +6,7 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { StatsCards } from "./StatsCards";
 import { ChartsSection } from "./ChartsSection";
 import { DataTableSection } from "./DataTableSection";
-import { TextInputCard } from "../TextInputCard";
-import { ButtonEventCard } from "../ButtonEventCard";
+import { DateRangeSelector } from "./DateRangeSelector";
 import { PlotCard } from "../PlotCard";
 
 export function Dashboard() {
@@ -34,23 +33,22 @@ export function Dashboard() {
         </header>
 
         <div className="flex flex-1 flex-col gap-6 p-4 pt-0">
-          {/* KPI Stats Cards */}
-          <StatsCards />
+          {/* Date Range Selector and KPI Stats */}
+          <div className="grid gap-6 lg:grid-cols-3">
+            <DateRangeSelector />
+            <div className="lg:col-span-2">
+              <StatsCards />
+            </div>
+          </div>
 
           {/* Charts Section */}
           <ChartsSection />
 
-          {/* Interactive Components (existing) */}
-          <div className="grid gap-6 md:grid-cols-2">
-            <TextInputCard />
-            <ButtonEventCard />
-          </div>
+          {/* Data Table Section */}
+          <DataTableSection />
 
-          {/* Data Section */}
-          <div className="grid gap-6 md:grid-cols-2">
-            <DataTableSection />
-            <PlotCard />
-          </div>
+          {/* Plot Section */}
+          <PlotCard />
         </div>
       </SidebarInset>
     </SidebarProvider>
