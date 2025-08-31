@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useShinyOutput } from "shiny-react";
 import { TrendingUp, Zap, DollarSign, Activity, Cpu } from "lucide-react";
+import { ErrorState } from "../ErrorState";
 
 export function StatsCards() {
   // Connect to Shiny outputs for Anthropic API KPI data
@@ -10,6 +11,13 @@ export function StatsCards() {
   const [totalCost] = useShinyOutput<string>("total_cost", "$0.00");
   const [activeModels] = useShinyOutput<string>("active_models", "0");
   const [apiCalls] = useShinyOutput<string>("api_calls", "0");
+  
+  // Check API status to determine if we should show error state
+  const [apiStatus] = useShinyOutput<{
+    status: string;
+    message: string;
+    last_update: string;
+  }>("api_status", undefined);
 
   // Format numbers for display
   const formatNumber = (value: string | undefined) => {
@@ -55,6 +63,22 @@ export function StatsCards() {
       description: "Total requests made"
     },
   ];
+
+  // Show error state if API is in error state and all values are defaults/zeros
+  if (apiStatus?.status === "error" && 
+      totalTokens === "0" && 
+      totalCost === "$0.00" && 
+      activeModels === "0" && 
+      apiCalls === "0") {
+    return (
+      <ErrorState 
+        title="Statistics Unavailable"
+        message={apiStatus.message}
+        showDemoModeButton={true}
+        showRetryButton={true}
+      />
+    );
+  }
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

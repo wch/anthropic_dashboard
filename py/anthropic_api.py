@@ -175,7 +175,13 @@ def fetch_anthropic_usage_report(
     workspace_id: Optional[str] = None,
     api_key_id: Optional[str] = None,
 ) -> UsageReportResponse | None:
-    """Fetch usage report from Anthropic API"""
+    """Fetch usage report from Anthropic API
+
+    Limit constraints based on bucket_width:
+    - "1d": Default 7 days, maximum 31 days
+    - "1h": Default 24 hours, maximum 168 hours (7 days)
+    - "1m": Default 60 minutes, maximum 1440 minutes (24 hours)
+    """
     if not api_key:
         return None
 
@@ -186,28 +192,58 @@ def fetch_anthropic_usage_report(
         "content-type": "application/json",
     }
 
+    # Apply bucket_width-specific limit constraints
+    if bucket_width == "1h":
+        api_limit = min(limit, 168)  # Max 168 hours (7 days)
+    elif bucket_width == "1m":
+        api_limit = min(limit, 1440)  # Max 1440 minutes (24 hours)
+    elif bucket_width == "1d":
+        api_limit = min(limit, 31)  # Max 31 days
+    else:
+        api_limit = min(limit, 31)  # Default fallback
+
     params = {
         "starting_at": starting_at,
         "bucket_width": bucket_width,
-        "limit": limit,
+        "limit": api_limit,
         "group_by[]": ["model", "service_tier", "workspace_id", "api_key_id"],
     }
 
+    # Only add ending_at if it's significantly after starting_at
+    # API requires ending_at to be after starting_at (not just same day)
     if ending_at:
-        params["ending_at"] = ending_at
+        from datetime import datetime, timedelta
 
+        try:
+            start_dt = datetime.fromisoformat(starting_at.replace("Z", "+00:00"))
+            end_dt = datetime.fromisoformat(ending_at.replace("Z", "+00:00"))
+            # Only add ending_at if it's at least 1 day after starting_at
+            if (end_dt - start_dt).total_seconds() > 86400:  # 24 hours
+                params["ending_at"] = ending_at
+        except:
+            # If date parsing fails, don't add ending_at
+            pass
+
+    # Add filtering parameters using the correct array format
     if workspace_id and workspace_id != "all":
-        params["workspace_id"] = workspace_id
+        params["workspace_ids[]"] = [workspace_id]
 
     if api_key_id and api_key_id != "all":
-        params["api_key_id"] = api_key_id
+        params["api_key_ids[]"] = [api_key_id]
 
     try:
+        print(f"Calling usage report API with params: {params}")
         response = requests.get(url, headers=headers, params=params)
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
         print(f"Error fetching usage report: {e}")
+        if hasattr(e, "response") and e.response is not None:
+            try:
+                error_body = e.response.json()
+                print(f"Error details: {error_body}")
+            except:
+                print(f"Error response body: {e.response.text[:500]}")
         return None
 
 
@@ -220,7 +256,12 @@ def fetch_anthropic_cost_report(
     workspace_id: Optional[str] = None,
     api_key_id: Optional[str] = None,
 ) -> CostReportResponse | None:
-    """Fetch cost report from Anthropic API"""
+    """Fetch cost report from Anthropic API
+
+    Note: Cost reports only support group_by=["workspace_id", "description"]
+    and bucket_width is always "1d" (daily). API key and model filtering
+    is not supported by the cost report API.
+    """
     if not api_key:
         return None
 
@@ -231,27 +272,48 @@ def fetch_anthropic_cost_report(
         "content-type": "application/json",
     }
 
+    # Ensure limit doesn't exceed API maximum of 31
+    api_limit = min(limit, 31)
+
     params = {
         "starting_at": starting_at,
-        "limit": limit,
-        "group_by[]": ["description", "workspace_id", "api_key_id", "model"],
+        "limit": api_limit,
+        "bucket_width": "1d",  # Cost reports only support daily granularity
+        "group_by[]": ["description", "workspace_id"],  # Only these are supported
     }
 
+    # Only add ending_at if it's significantly after starting_at
+    # API requires ending_at to be after starting_at (not just same day)
     if ending_at:
-        params["ending_at"] = ending_at
+        from datetime import datetime
 
-    if workspace_id and workspace_id != "all":
-        params["workspace_id"] = workspace_id
+        try:
+            start_dt = datetime.fromisoformat(starting_at.replace("Z", "+00:00"))
+            end_dt = datetime.fromisoformat(ending_at.replace("Z", "+00:00"))
+            # Only add ending_at if it's at least 1 day after starting_at
+            if (end_dt - start_dt).total_seconds() > 86400:  # 24 hours
+                params["ending_at"] = ending_at
+        except:
+            # If date parsing fails, don't add ending_at
+            pass
 
-    if api_key_id and api_key_id != "all":
-        params["api_key_id"] = api_key_id
+    # Note: workspace_id and api_key_id filtering in the URL parameters
+    # is not supported by the cost report API. Filtering must be done
+    # client-side after receiving the data.
 
     try:
+        print(f"Calling cost report API with params: {params}")
         response = requests.get(url, headers=headers, params=params)
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
         print(f"Error fetching cost report: {e}")
+        if hasattr(e, "response") and e.response is not None:
+            try:
+                error_body = e.response.json()
+                print(f"Error details: {error_body}")
+            except:
+                print(f"Error response body: {e.response.text[:500]}")
         return None
 
 

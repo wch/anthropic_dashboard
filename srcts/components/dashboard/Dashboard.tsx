@@ -8,6 +8,8 @@ import { ChartsSection } from "./ChartsSection";
 import { DataTableSection } from "./DataTableSection";
 import { FilterControls } from "./FilterControls";
 import { PlotCard } from "../PlotCard";
+import { DemoModeToggle } from "../DemoModeToggle";
+import { ToastSystem } from "../ToastSystem";
 
 export function Dashboard() {
   return (
@@ -30,6 +32,11 @@ export function Dashboard() {
               </BreadcrumbList>
             </Breadcrumb>
           </div>
+          
+          {/* Demo Mode Toggle in Header */}
+          <div className="ml-auto px-4">
+            <DemoModeToggle />
+          </div>
         </header>
 
         <div className="flex flex-1 flex-col gap-6 p-4 pt-0">
@@ -49,6 +56,9 @@ export function Dashboard() {
           <PlotCard />
         </div>
       </SidebarInset>
+      
+      {/* Toast Notification System */}
+      <ToastSystem />
     </SidebarProvider>
   );
 }

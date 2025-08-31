@@ -170,7 +170,11 @@ def generate_demo_api_key_data() -> list[ApiKeyData]:
 
 
 def generate_demo_cost_data(granularity: str = "1d") -> pd.DataFrame:
-    """Generate demo cost data when API is unavailable"""
+    """Generate demo cost data when API is unavailable
+    
+    Note: Cost reports are always daily granularity according to Anthropic API,
+    so we ignore the granularity parameter and always generate daily data.
+    """
     end_date = datetime.now()
     start_date = end_date - timedelta(days=7)
 
@@ -185,19 +189,11 @@ def generate_demo_cost_data(granularity: str = "1d") -> pd.DataFrame:
         "sk-ant-api03-000",
     ]
 
-    # Generate time points based on granularity
+    # Cost reports are always daily - ignore granularity parameter
     time_points = []
-    if granularity == "1h":
-        # Generate hourly data points for the last 3 days
-        current_time = end_date - timedelta(days=3)
-        while current_time <= end_date:
-            time_points.append(current_time.strftime("%Y-%m-%d %H:00"))
-            current_time += timedelta(hours=1)
-    else:
-        # Generate daily data points (default behavior)
-        for i in range(7):
-            current_date = (start_date + timedelta(days=i)).strftime("%Y-%m-%d")
-            time_points.append(current_date)
+    for i in range(7):
+        current_date = (start_date + timedelta(days=i)).strftime("%Y-%m-%d")
+        time_points.append(current_date)
 
     for time_point in time_points:
         for model in models:
@@ -210,13 +206,8 @@ def generate_demo_cost_data(granularity: str = "1d") -> pd.DataFrame:
                         else api_keys[1:3] if workspace == "ws_456def" else api_keys[2:]
                     )
                     for api_key in workspace_api_keys:
-                        # Adjust cost amounts based on granularity
-                        if granularity == "1h":
-                            # Hourly costs should be smaller
-                            amount = np.random.uniform(0.05, 1.50)
-                        else:
-                            # Daily costs - larger amounts
-                            amount = np.random.uniform(0.50, 15.00)
+                        # Cost reports are always daily amounts
+                        amount = np.random.uniform(0.50, 15.00)
 
                         row: CostDataRow = {
                             "date": time_point,

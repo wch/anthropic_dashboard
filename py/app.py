@@ -1,7 +1,7 @@
 # pyright: strict
 # pyright: reportUnusedFunction=false
 
-from typing import TypedDict
+from typing import TypedDict, Tuple, Literal
 from shiny import App, Inputs, Outputs, Session, ui, render, reactive
 from shinyreact import page_bare, render_object
 from pathlib import Path
@@ -43,6 +43,15 @@ class UiApiStatus(TypedDict):
     last_update: str
 
 
+DataSource = Literal["api", "demo", "error"]
+
+
+class DataWithSource(TypedDict):
+    data: pd.DataFrame
+    source: DataSource
+    error_message: str | None
+
+
 # Load environment variables
 load_dotenv()
 
@@ -73,7 +82,10 @@ def process_usage_data(
         for time_bucket in usage_response["data"]:
             # Preserve timestamp granularity based on the granularity setting
             starting_at = time_bucket["starting_at"]
-            if granularity == "1h":
+            if granularity == "1m":
+                # For per-minute, preserve date, hour, and minute (YYYY-MM-DD HH:MM:00)
+                datetime_key = starting_at[:16] + ":00"
+            elif granularity == "1h":
                 # For hourly, preserve date and hour (YYYY-MM-DD HH:00)
                 datetime_key = starting_at[:13] + ":00"
             elif granularity in ["1d", "7d", "30d"]:
@@ -124,7 +136,10 @@ def process_cost_data(
         for time_bucket in cost_response["data"]:
             # Preserve timestamp granularity based on the granularity setting
             starting_at = time_bucket["starting_at"]
-            if granularity == "1h":
+            if granularity == "1m":
+                # For per-minute, preserve date, hour, and minute (YYYY-MM-DD HH:MM:00)
+                datetime_key = starting_at[:16] + ":00"
+            elif granularity == "1h":
                 # For hourly, preserve date and hour (YYYY-MM-DD HH:00)
                 datetime_key = starting_at[:13] + ":00"
             elif granularity in ["1d", "7d", "30d"]:
@@ -138,9 +153,11 @@ def process_cost_data(
 
             for result in time_bucket["results"]:
                 # Extract values with proper type handling
+                # API returns amount in cents, convert to dollars
                 amount_raw = result.get("amount", 0)
                 try:
-                    amount = float(amount_raw)
+                    amount_cents = float(amount_raw)
+                    amount = amount_cents / 100.0  # Convert cents to dollars
                 except (ValueError, TypeError):
                     amount = 0.0
 
@@ -185,8 +202,8 @@ def server(input: Inputs, output: Outputs, session: Session):
     # === REACTIVE DATA FETCHING ===
 
     @reactive.calc
-    def raw_usage_data():
-        """Fetch raw usage data from API or demo source"""
+    def raw_usage_data() -> DataWithSource:
+        """Fetch raw usage data from API or demo source based on user preference"""
         try:
             start_date = (
                 input.date_start()
@@ -204,20 +221,40 @@ def server(input: Inputs, output: Outputs, session: Session):
                 and input.filter_granularity() is not None
                 else "1d"
             )
+            # Check if user has enabled demo mode
+            use_demo_mode = (
+                input.use_demo_mode()
+                if hasattr(input, "use_demo_mode") and input.use_demo_mode() is not None
+                else False
+            )
         except:
             # If input access fails, use default values
             start_date = default_start
             end_date = default_end
             granularity = "1d"
+            use_demo_mode = False
 
         print(
-            f"Raw usage data - start: {start_date}, end: {end_date}, granularity: {granularity}, has_key: {bool(ANTHROPIC_API_KEY)}"
+            f"Raw usage data - start: {start_date}, end: {end_date}, granularity: {granularity}, has_key: {bool(ANTHROPIC_API_KEY)}, demo_mode: {use_demo_mode}"
         )
 
+        # If user explicitly enabled demo mode, use demo data
+        if use_demo_mode:
+            print("Using demo usage data (user enabled demo mode)")
+            return {
+                "data": generate_demo_usage_data(granularity),
+                "source": "demo",
+                "error_message": None,
+            }
+
+        # If no API key available and user hasn't enabled demo mode, return error
         if not ANTHROPIC_API_KEY:
-            # Return demo data when API key is not available
-            print("Using demo usage data (no API key)")
-            return generate_demo_usage_data(granularity)
+            print("No API key available and demo mode disabled")
+            return {
+                "data": pd.DataFrame(),
+                "source": "error",
+                "error_message": "ANTHROPIC_ADMIN_KEY not found in environment variables. Enable demo mode to see sample data.",
+            }
 
         try:
             # Calculate appropriate limit based on granularity and date range
@@ -227,20 +264,45 @@ def server(input: Inputs, output: Outputs, session: Session):
             end_dt = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
             days_diff = (end_dt - start_dt).days + 1
 
-            # Calculate limit based on granularity
+            # Calculate limit based on granularity and API constraints
+            warning_message = None
             if granularity == "1h":
-                api_limit = min(days_diff * 24, 1000)  # Max 1000 for safety
+                # API max: 168 hours (7 days)
+                requested_hours = days_diff * 24
+                api_limit = min(requested_hours, 168)
+                if requested_hours > 168:
+                    warning_message = f"Date range truncated: Requested {requested_hours} hours of data, but API maximum is 168 hours (7 days). Showing last 7 days only."
+                    print(f"Warning: {warning_message}")
+            elif granularity == "1m":
+                # API max: 1440 minutes (24 hours)
+                requested_minutes = days_diff * 24 * 60
+                api_limit = min(requested_minutes, 1440)
+                if requested_minutes > 1440:
+                    warning_message = f"Date range truncated: Requested {requested_minutes} minutes of data, but API maximum is 1440 minutes (24 hours). Showing last 24 hours only."
+                    print(f"Warning: {warning_message}")
             elif granularity == "1d":
-                api_limit = min(days_diff, 365)  # Max 1 year
+                # API max: 31 days
+                api_limit = min(days_diff, 31)
+                if days_diff > 31:
+                    warning_message = f"Date range truncated: Requested {days_diff} days of data, but API maximum is 31 days. Showing last 31 days only."
+                    print(f"Warning: {warning_message}")
             elif granularity == "7d":
-                api_limit = min((days_diff // 7) + 1, 52)  # Max 1 year in weeks
+                # For weekly, still constrained by daily limit of 31
+                api_limit = min((days_diff // 7) + 1, 31)
             elif granularity == "30d":
-                api_limit = min((days_diff // 30) + 1, 12)  # Max 1 year in months
+                # For monthly, still constrained by daily limit of 31
+                api_limit = min((days_diff // 30) + 1, 31)
             else:
                 api_limit = 31  # Default fallback
 
+            # Send warning message to UI if limit was exceeded
+            if warning_message:
+                session.send_custom_message(
+                    "warning", {"message": warning_message, "type": "warning"}
+                )
+
             print(
-                f"Using API limit: {api_limit} for granularity: {granularity}, days: {days_diff}"
+                f"Calling Anthropic API with limit: {api_limit} for granularity: {granularity}, days: {days_diff}"
             )
 
             usage_response = fetch_anthropic_usage_report(
@@ -252,21 +314,31 @@ def server(input: Inputs, output: Outputs, session: Session):
             )
             df = process_usage_data(usage_response, granularity)
 
-            # If API call succeeded but returned empty data, use demo data
+            # If API call succeeded but returned empty data, return error (no automatic fallback)
             if df.empty:
-                print("No usage data returned from API, using demo data")
-                return generate_demo_usage_data(granularity)
+                print("API returned empty usage data")
+                return {
+                    "data": pd.DataFrame(),
+                    "source": "error",
+                    "error_message": "API returned no usage data for the selected date range. Try adjusting the date range or enable demo mode.",
+                }
 
-            print(f"Returning real usage data with {len(df)} rows")
-            return df
+            print(f"Successfully retrieved real usage data with {len(df)} rows")
+            return {"data": df, "source": "api", "error_message": None}
         except Exception as e:
-            print(f"Error in raw_usage_data: {e}, using demo data")
-            return generate_demo_usage_data(granularity)
+            error_msg = str(e)
+            print(f"Error calling Anthropic API for usage data: {error_msg}")
+            return {
+                "data": pd.DataFrame(),
+                "source": "error",
+                "error_message": f"API call failed: {error_msg}. Enable demo mode to see sample data.",
+            }
 
     @reactive.calc
     def usage_data() -> pd.DataFrame:
         """Apply filters to raw usage data"""
-        df = raw_usage_data()
+        data_with_source = raw_usage_data()
+        df = data_with_source["data"]
         if df.empty:
             return df
 
@@ -313,8 +385,8 @@ def server(input: Inputs, output: Outputs, session: Session):
         return filtered_df
 
     @reactive.calc
-    def raw_cost_data() -> pd.DataFrame:
-        """Fetch raw cost data from API or demo source"""
+    def raw_cost_data() -> DataWithSource:
+        """Fetch raw cost data from API or demo source based on user preference"""
         try:
             start_date = (
                 input.date_start()
@@ -326,19 +398,50 @@ def server(input: Inputs, output: Outputs, session: Session):
                 if hasattr(input, "date_end") and input.date_end() is not None
                 else default_end
             )
+            # Check if user has enabled demo mode
+            use_demo_mode = (
+                input.use_demo_mode()
+                if hasattr(input, "use_demo_mode") and input.use_demo_mode() is not None
+                else False
+            )
         except:
             # If input access fails, use default dates
             start_date = default_start
             end_date = default_end
+            use_demo_mode = False
+
+        # Get granularity for cost data consistency
+        try:
+            granularity = (
+                input.filter_granularity()
+                if hasattr(input, "filter_granularity")
+                and input.filter_granularity() is not None
+                else "1d"
+            )
+        except:
+            granularity = "1d"
 
         print(
-            f"Raw cost data - start: {start_date}, end: {end_date}, has_key: {bool(ANTHROPIC_API_KEY)}"
+            f"Raw cost data - start: {start_date}, end: {end_date}, granularity: {granularity}, has_key: {bool(ANTHROPIC_API_KEY)}, demo_mode: {use_demo_mode}"
         )
 
+        # If user explicitly enabled demo mode, use demo data
+        if use_demo_mode:
+            print("Using demo cost data (user enabled demo mode)")
+            return {
+                "data": generate_demo_cost_data(granularity),
+                "source": "demo",
+                "error_message": None,
+            }
+
+        # If no API key available and user hasn't enabled demo mode, return error
         if not ANTHROPIC_API_KEY:
-            # Return demo data when API key is not available
-            print("Using demo cost data (no API key)")
-            return generate_demo_cost_data(granularity)
+            print("No API key available and demo mode disabled")
+            return {
+                "data": pd.DataFrame(),
+                "source": "error",
+                "error_message": "ANTHROPIC_ADMIN_KEY not found in environment variables. Enable demo mode to see sample data.",
+            }
 
         try:
             # Calculate appropriate limit for cost data based on date range
@@ -353,42 +456,45 @@ def server(input: Inputs, output: Outputs, session: Session):
                 days_diff * 10, 1000
             )  # Assume up to 10 cost entries per day, max 1000
 
-            print(f"Using cost API limit: {cost_limit} for {days_diff} days")
-
-            # Get granularity for cost data consistency
-            try:
-                granularity = (
-                    input.filter_granularity()
-                    if hasattr(input, "filter_granularity")
-                    and input.filter_granularity() is not None
-                    else "1d"
-                )
-            except:
-                granularity = "1d"
+            print(
+                f"Calling Anthropic API for cost data with limit: {cost_limit} for {days_diff} days"
+            )
 
             cost_response = fetch_anthropic_cost_report(
                 ANTHROPIC_API_KEY,
                 start_date,
                 end_date,
                 limit=cost_limit,
+                # Note: workspace_id and api_key_id filtering not supported by cost API
+                # Will filter client-side in cost_data() function
             )
             df = process_cost_data(cost_response, granularity)
 
-            # If API call succeeded but returned empty data, use demo data
+            # If API call succeeded but returned empty data, return error (no automatic fallback)
             if df.empty:
-                print("No cost data returned from API, using demo data")
-                return generate_demo_cost_data(granularity)
+                print("API returned empty cost data")
+                return {
+                    "data": pd.DataFrame(),
+                    "source": "error",
+                    "error_message": "API returned no cost data for the selected date range. Try adjusting the date range or enable demo mode.",
+                }
 
-            print(f"Returning real cost data with {len(df)} rows")
-            return df
+            print(f"Successfully retrieved real cost data with {len(df)} rows")
+            return {"data": df, "source": "api", "error_message": None}
         except Exception as e:
-            print(f"Error in raw_cost_data: {e}, using demo data")
-            return generate_demo_cost_data(granularity)
+            error_msg = str(e)
+            print(f"Error calling Anthropic API for cost data: {error_msg}")
+            return {
+                "data": pd.DataFrame(),
+                "source": "error",
+                "error_message": f"API call failed: {error_msg}. Enable demo mode to see sample data.",
+            }
 
     @reactive.calc
     def cost_data() -> pd.DataFrame:
         """Apply filters to raw cost data"""
-        df = raw_cost_data()
+        data_with_source = raw_cost_data()
+        df = data_with_source["data"]
         if df.empty:
             return df
 
@@ -438,9 +544,23 @@ def server(input: Inputs, output: Outputs, session: Session):
 
     @reactive.calc
     def workspaces_metadata():
-        """Cache workspace metadata from API"""
-        if not ANTHROPIC_API_KEY:
+        """Cache workspace metadata from API based on user preference"""
+        try:
+            use_demo_mode = (
+                input.use_demo_mode()
+                if hasattr(input, "use_demo_mode") and input.use_demo_mode() is not None
+                else False
+            )
+        except:
+            use_demo_mode = False
+
+        # If user enabled demo mode, use demo data
+        if use_demo_mode:
             return generate_demo_workspace_data()
+
+        # If no API key and demo mode disabled, return empty list
+        if not ANTHROPIC_API_KEY:
+            return []
 
         try:
             workspaces_response = fetch_workspaces(api_key=ANTHROPIC_API_KEY)
@@ -449,11 +569,11 @@ def server(input: Inputs, output: Outputs, session: Session):
         except Exception as e:
             print(f"Error in workspaces_metadata: {e}")
 
-        return generate_demo_workspace_data()
+        return []  # Return empty list on error, no automatic fallback
 
     @reactive.calc
     def api_keys_metadata():
-        """Cache API keys metadata from API (filtered by workspace if needed)"""
+        """Cache API keys metadata from API (filtered by workspace if needed) based on user preference"""
         try:
             workspace_filter = (
                 input.filter_workspace_id()
@@ -461,16 +581,27 @@ def server(input: Inputs, output: Outputs, session: Session):
                 and input.filter_workspace_id() is not None
                 else "all"
             )
+            use_demo_mode = (
+                input.use_demo_mode()
+                if hasattr(input, "use_demo_mode") and input.use_demo_mode() is not None
+                else False
+            )
         except:
             workspace_filter = "all"
+            use_demo_mode = False
 
-        if not ANTHROPIC_API_KEY:
+        # If user enabled demo mode, use demo data
+        if use_demo_mode:
             demo_keys = generate_demo_api_key_data()
             if workspace_filter != "all":
                 return [
                     k for k in demo_keys if k.get("workspace_id") == workspace_filter
                 ]
             return demo_keys
+
+        # If no API key and demo mode disabled, return empty list
+        if not ANTHROPIC_API_KEY:
+            return []
 
         try:
             api_keys_response = fetch_api_keys(
@@ -482,18 +613,15 @@ def server(input: Inputs, output: Outputs, session: Session):
         except Exception as e:
             print(f"Error in api_keys_metadata: {e}")
 
-        # Fallback to demo data filtered by workspace
-        demo_keys = generate_demo_api_key_data()
-        if workspace_filter != "all":
-            return [k for k in demo_keys if k.get("workspace_id") == workspace_filter]
-        return demo_keys
+        return []  # Return empty list on error, no automatic fallback
 
     # === FILTER OPTIONS ===
 
     @render_object
     def available_workspaces() -> list[UiWorkspaceData]:
         """Get available workspaces with names and IDs, sorted by creation time"""
-        df = raw_usage_data()
+        data_with_source = raw_usage_data()
+        df = data_with_source["data"]
         if df.empty:
             return []
 
@@ -521,7 +649,8 @@ def server(input: Inputs, output: Outputs, session: Session):
     @render_object
     def available_api_keys() -> list[UiApiKeyData]:
         """Get available API keys with names and IDs, filtered by selected workspace, sorted by creation time"""
-        df = raw_usage_data()
+        data_with_source = raw_usage_data()
+        df = data_with_source["data"]
         if df.empty:
             return []
 
@@ -564,7 +693,8 @@ def server(input: Inputs, output: Outputs, session: Session):
     @render_object
     def available_models() -> list[str]:
         """Get available models from the data"""
-        df = raw_usage_data()
+        data_with_source = raw_usage_data()
+        df = data_with_source["data"]
         if df.empty:
             return []
 
@@ -586,16 +716,65 @@ def server(input: Inputs, output: Outputs, session: Session):
                 "last_update": datetime.now().isoformat(),
             }
 
-        # Check API status based on whether we have usage data (no extra API call needed)
+        # Check API status based on data source from usage and cost data
         try:
-            df = raw_usage_data()
-            if not df.empty and len(df) > 0:
+            usage_data_info = raw_usage_data()
+            cost_data_info = raw_cost_data()
+
+            usage_source = usage_data_info["source"]
+            cost_source = cost_data_info["source"]
+
+            # Determine overall status based on both data sources
+            if usage_source == "api" and cost_source == "api":
                 return {
                     "status": "connected",
-                    "message": "Connected to Anthropic API. Showing live data.",
+                    "message": "Connected to Anthropic API. Showing live usage and cost data.",
+                    "last_update": datetime.now().isoformat(),
+                }
+            elif usage_source == "api" or cost_source == "api":
+                # Mixed - some API data available
+                api_types = []
+                demo_types = []
+                error_msgs = []
+
+                if usage_source == "api":
+                    api_types.append("usage")
+                else:
+                    demo_types.append("usage")
+                    if usage_data_info["error_message"]:
+                        error_msgs.append(f"Usage: {usage_data_info['error_message']}")
+
+                if cost_source == "api":
+                    api_types.append("cost")
+                else:
+                    demo_types.append("cost")
+                    if cost_data_info["error_message"]:
+                        error_msgs.append(f"Cost: {cost_data_info['error_message']}")
+
+                message = f"Partially connected. Live {' and '.join(api_types)} data, demo {' and '.join(demo_types)} data."
+                if error_msgs:
+                    message += f" Issues: {'; '.join(error_msgs)}"
+
+                return {
+                    "status": "partial",
+                    "message": message,
+                    "last_update": datetime.now().isoformat(),
+                }
+            elif usage_source == "error" or cost_source == "error":
+                # API calls failed
+                error_msgs = []
+                if usage_data_info["error_message"]:
+                    error_msgs.append(f"Usage: {usage_data_info['error_message']}")
+                if cost_data_info["error_message"]:
+                    error_msgs.append(f"Cost: {cost_data_info['error_message']}")
+
+                return {
+                    "status": "error",
+                    "message": f"API connection failed. Using demo data. Errors: {'; '.join(error_msgs)}",
                     "last_update": datetime.now().isoformat(),
                 }
             else:
+                # Both are demo (fallback cases)
                 return {
                     "status": "demo",
                     "message": "Using demo data. API may be rate-limited or returning empty results.",
@@ -604,7 +783,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         except Exception as e:
             return {
                 "status": "error",
-                "message": f"API connection failed: {str(e)}",
+                "message": f"Failed to determine API status: {str(e)}",
                 "last_update": datetime.now().isoformat(),
             }
 
@@ -640,6 +819,16 @@ def server(input: Inputs, output: Outputs, session: Session):
             return "0"
         # Estimate API calls (this is approximate)
         return str(len(df))
+
+    # === FILTER STATES (for sharing between components) ===
+
+    @render.text
+    def current_granularity():
+        """Return current granularity setting for chart formatting"""
+        try:
+            return input.filter_granularity() or "1d"
+        except:
+            return "1d"
 
     # === CHART DATA ===
 
