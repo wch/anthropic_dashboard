@@ -1,14 +1,47 @@
+# pyright: strict
+# pyright: reportUnusedFunction=false
+
+from typing import TypedDict
 from shiny import App, Inputs, Outputs, Session, ui, render, reactive
 from shinyreact import page_bare, render_object
 from pathlib import Path
 import pandas as pd
 import matplotlib.pyplot as plt
-import numpy as np
 from datetime import datetime, timedelta
-import requests
 import os
 from dotenv import load_dotenv
-import json
+from anthropic_api import (
+    fetch_anthropic_usage_report,
+    fetch_anthropic_cost_report,
+    fetch_workspaces,
+    fetch_api_keys,
+    UsageReportResponse,
+    CostReportResponse,
+)
+from demo_data import (
+    generate_demo_usage_data,
+    generate_demo_cost_data,
+    generate_demo_workspace_data,
+    generate_demo_api_key_data,
+)
+from data_types import CostDataRow
+
+
+class UiWorkspaceData(TypedDict):
+    id: str
+    name: str
+
+
+class UiApiKeyData(TypedDict):
+    id: str
+    name: str
+
+
+class UiApiStatus(TypedDict):
+    status: str
+    message: str
+    last_update: str
+
 
 # Load environment variables
 load_dotenv()
@@ -17,42 +50,6 @@ load_dotenv()
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_ADMIN_KEY")
 ANTHROPIC_API_BASE = "https://api.anthropic.com"
 ANTHROPIC_VERSION = "2023-06-01"
-
-# Global cache for API responses
-_api_cache = {}
-
-
-def cache_key(*args, **kwargs):
-    """Generate cache key from function arguments"""
-    key_parts = list(args) + [f"{k}={v}" for k, v in sorted(kwargs.items())]
-    return "|".join(str(p) for p in key_parts)
-
-
-def cached_api_call(cache_duration_seconds=300):
-    """Decorator to cache API responses for specified duration (default 5 minutes)"""
-
-    def decorator(func):
-        def wrapper(*args, **kwargs):
-            key = f"{func.__name__}:{cache_key(*args, **kwargs)}"
-            current_time = datetime.now()
-
-            # Check if we have a valid cached response
-            if key in _api_cache:
-                cached_data, cached_time = _api_cache[key]
-                if (current_time - cached_time).seconds < cache_duration_seconds:
-                    print(
-                        f"Using cached {func.__name__} (age: {(current_time - cached_time).seconds}s)"
-                    )
-                    return cached_data
-
-            # Make fresh API call and cache result
-            result = func(*args, **kwargs)
-            _api_cache[key] = (result, current_time)
-            return result
-
-        return wrapper
-
-    return decorator
 
 
 # Check API key availability and warn user
@@ -64,346 +61,7 @@ else:
     print("✓ Anthropic API key found. Dashboard will fetch live data.")
 
 
-@cached_api_call(cache_duration_seconds=120)  # Cache usage reports for 2 minutes
-def fetch_anthropic_usage_report(
-    starting_at,
-    ending_at=None,
-    bucket_width="1d",
-    limit=31,
-    workspace_id=None,
-    api_key_id=None,
-):
-    """Fetch usage report from Anthropic API"""
-    if not ANTHROPIC_API_KEY:
-        return None
-
-    url = f"{ANTHROPIC_API_BASE}/v1/organizations/usage_report/messages"
-    headers = {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": ANTHROPIC_VERSION,
-        "content-type": "application/json",
-    }
-
-    params = {
-        "starting_at": starting_at,
-        "bucket_width": bucket_width,
-        "limit": limit,
-        "group_by[]": ["model", "service_tier", "workspace_id", "api_key_id"],
-    }
-
-    if ending_at:
-        params["ending_at"] = ending_at
-
-    if workspace_id and workspace_id != "all":
-        params["workspace_id"] = workspace_id
-
-    if api_key_id and api_key_id != "all":
-        params["api_key_id"] = api_key_id
-
-    try:
-        response = requests.get(url, headers=headers, params=params)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching usage report: {e}")
-        return None
-
-
-@cached_api_call(cache_duration_seconds=120)  # Cache cost reports for 2 minutes
-def fetch_anthropic_cost_report(
-    starting_at, ending_at=None, limit=31, workspace_id=None, api_key_id=None
-):
-    """Fetch cost report from Anthropic API"""
-    if not ANTHROPIC_API_KEY:
-        return None
-
-    url = f"{ANTHROPIC_API_BASE}/v1/organizations/cost_report"
-    headers = {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": ANTHROPIC_VERSION,
-        "content-type": "application/json",
-    }
-
-    params = {
-        "starting_at": starting_at,
-        "limit": limit,
-        "group_by[]": ["description", "workspace_id", "api_key_id", "model"],
-    }
-
-    if ending_at:
-        params["ending_at"] = ending_at
-
-    if workspace_id and workspace_id != "all":
-        params["workspace_id"] = workspace_id
-
-    if api_key_id and api_key_id != "all":
-        params["api_key_id"] = api_key_id
-
-    try:
-        response = requests.get(url, headers=headers, params=params)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching cost report: {e}")
-        return None
-
-
-@cached_api_call(cache_duration_seconds=600)  # Cache workspaces for 10 minutes
-def fetch_workspaces(*, limit=1000):
-    """Fetch workspace metadata from Anthropic API, sorted by creation time (oldest first)"""
-    if not ANTHROPIC_API_KEY:
-        return None
-
-    url = f"{ANTHROPIC_API_BASE}/v1/organizations/workspaces?limit={limit}"
-    headers = {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": ANTHROPIC_VERSION,
-        "content-type": "application/json",
-    }
-
-    try:
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
-        data = response.json()
-
-        # Sort workspaces by created_at (oldest first)
-        if "data" in data and data["data"]:
-            data["data"] = sorted(
-                data["data"], key=lambda x: x.get("created_at", ""), reverse=False
-            )
-
-        return data
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching workspaces: {e}")
-        return None
-
-
-@cached_api_call(cache_duration_seconds=600)  # Cache API keys for 10 minutes
-def fetch_api_keys(workspace_id=None, *, limit=1000):
-    """Fetch API key metadata from Anthropic API, sorted by creation time (oldest first)"""
-    if not ANTHROPIC_API_KEY:
-        return None
-
-    url = f"{ANTHROPIC_API_BASE}/v1/organizations/api_keys?limit={limit}"
-    headers = {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": ANTHROPIC_VERSION,
-        "content-type": "application/json",
-    }
-
-    params = {}
-    if workspace_id and workspace_id != "all":
-        params["workspace_id"] = workspace_id
-
-    try:
-        response = requests.get(url, headers=headers, params=params)
-        response.raise_for_status()
-        data = response.json()
-
-        # Sort API keys by created_at (oldest first)
-        if "data" in data and data["data"]:
-            data["data"] = sorted(
-                data["data"], key=lambda x: x.get("created_at", ""), reverse=False
-            )
-
-        return data
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching API keys: {e}")
-        return None
-
-
-def generate_demo_usage_data():
-    """Generate demo usage data when API is unavailable"""
-    end_date = datetime.now()
-    start_date = end_date - timedelta(days=7)
-
-    rows = []
-    models = ["claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"]
-    service_tiers = ["standard", "batch"]
-    workspaces = ["ws_123abc", "ws_456def", "ws_789ghi"]
-    api_keys = [
-        "sk-ant-api03-123",
-        "sk-ant-api03-456",
-        "sk-ant-api03-789",
-        "sk-ant-api03-000",
-    ]
-
-    for i in range(7):
-        current_date = (start_date + timedelta(days=i)).strftime("%Y-%m-%d")
-        for model in models:
-            for tier in service_tiers:
-                for workspace in workspaces:
-                    # Each workspace has some API keys
-                    workspace_api_keys = (
-                        api_keys[:2]
-                        if workspace == "ws_123abc"
-                        else api_keys[1:3] if workspace == "ws_456def" else api_keys[2:]
-                    )
-                    for api_key in workspace_api_keys:
-                        input_tokens = np.random.randint(1000, 10000)
-                        output_tokens = np.random.randint(500, 3000)
-                        rows.append(
-                            {
-                                "date": current_date,
-                                "model": model,
-                                "service_tier": tier,
-                                "workspace_id": workspace,
-                                "api_key_id": api_key,
-                                "input_tokens": input_tokens,
-                                "output_tokens": output_tokens,
-                                "cache_creation_1h": np.random.randint(0, 100),
-                                "cache_creation_5m": np.random.randint(0, 50),
-                                "web_search_requests": np.random.randint(0, 10),
-                            }
-                        )
-
-    return pd.DataFrame(rows)
-
-
-def generate_demo_workspace_data():
-    """Generate demo workspace metadata with timestamps, sorted by creation time (oldest first)"""
-    from datetime import datetime, timedelta
-
-    base_time = datetime.now()
-    workspaces = [
-        {
-            "id": "ws_123abc",
-            "name": "Development Team",
-            "display_color": "#6C5BB9",
-            "created_at": (base_time - timedelta(days=1)).isoformat() + "Z",
-        },
-        {
-            "id": "ws_456def",
-            "name": "Production Environment",
-            "display_color": "#2E7D32",
-            "created_at": (base_time - timedelta(days=7)).isoformat() + "Z",
-        },
-        {
-            "id": "ws_789ghi",
-            "name": "Research & Analytics",
-            "display_color": "#F57C00",
-            "created_at": (base_time - timedelta(days=3)).isoformat() + "Z",
-        },
-        {
-            "id": "ws_oldformat",
-            "name": "",
-            "display_color": "#9E9E9E",
-            "created_at": (base_time - timedelta(days=30)).isoformat() + "Z",
-        },
-        {
-            "id": "default",
-            "name": "Default",
-            "display_color": "#757575",
-            "created_at": (base_time - timedelta(days=365)).isoformat() + "Z",
-        },
-    ]
-
-    # Sort by created_at (oldest first)
-    return sorted(workspaces, key=lambda x: x["created_at"], reverse=False)
-
-
-def generate_demo_api_key_data():
-    """Generate demo API key metadata with timestamps, sorted by creation time (oldest first)"""
-    from datetime import datetime, timedelta
-
-    base_time = datetime.now()
-    api_keys = [
-        {
-            "id": "sk-ant-api03-123",
-            "name": "Development Key",
-            "workspace_id": "ws_123abc",
-            "partial_key_hint": "sk-ant-api03-123...abc",
-            "created_at": (base_time - timedelta(hours=2)).isoformat() + "Z",
-        },
-        {
-            "id": "sk-ant-api03-456",
-            "name": "Production Key",
-            "workspace_id": "ws_456def",
-            "partial_key_hint": "sk-ant-api03-456...def",
-            "created_at": (base_time - timedelta(days=2)).isoformat() + "Z",
-        },
-        {
-            "id": "sk-ant-api03-789",
-            "name": "Analytics Key",
-            "workspace_id": "ws_789ghi",
-            "partial_key_hint": "sk-ant-api03-789...ghi",
-            "created_at": (base_time - timedelta(days=5)).isoformat() + "Z",
-        },
-        {
-            "id": "sk-ant-api03-000",
-            "name": "Backup Key",
-            "workspace_id": "ws_123abc",
-            "partial_key_hint": "sk-ant-api03-000...xyz",
-            "created_at": (base_time - timedelta(days=1)).isoformat() + "Z",
-        },
-        {
-            "id": "sk-ant-api03-legacy",
-            "name": "",
-            "workspace_id": "ws_oldformat",
-            "partial_key_hint": "sk-ant-api03-legacy...old",
-            "created_at": (base_time - timedelta(days=45)).isoformat() + "Z",
-        },
-        {
-            "id": "sk-ant-api03-default",
-            "name": "Default API Key",
-            "workspace_id": "default",
-            "partial_key_hint": "sk-ant-api03-default...xyz",
-            "created_at": (base_time - timedelta(days=400)).isoformat() + "Z",
-        },
-    ]
-
-    # Sort by created_at (oldest first)
-    return sorted(api_keys, key=lambda x: x["created_at"], reverse=False)
-
-
-def generate_demo_cost_data():
-    """Generate demo cost data when API is unavailable"""
-    end_date = datetime.now()
-    start_date = end_date - timedelta(days=7)
-
-    rows = []
-    models = ["claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"]
-    descriptions = ["Input tokens", "Output tokens", "Cache creation"]
-    workspaces = ["ws_123abc", "ws_456def", "ws_789ghi"]
-    api_keys = [
-        "sk-ant-api03-123",
-        "sk-ant-api03-456",
-        "sk-ant-api03-789",
-        "sk-ant-api03-000",
-    ]
-
-    for i in range(7):
-        current_date = (start_date + timedelta(days=i)).strftime("%Y-%m-%d")
-        for model in models:
-            for desc in descriptions:
-                for workspace in workspaces:
-                    # Each workspace has some API keys
-                    workspace_api_keys = (
-                        api_keys[:2]
-                        if workspace == "ws_123abc"
-                        else api_keys[1:3] if workspace == "ws_456def" else api_keys[2:]
-                    )
-                    for api_key in workspace_api_keys:
-                        amount = np.random.uniform(0.50, 15.00)
-                        rows.append(
-                            {
-                                "date": current_date,
-                                "description": desc,
-                                "amount": amount,
-                                "currency": "USD",
-                                "model": model,
-                                "workspace_id": workspace,
-                                "api_key_id": api_key,
-                                "service_tier": "standard",
-                                "cost_type": "tokens",
-                                "token_type": "input" if "Input" in desc else "output",
-                            }
-                        )
-
-    return pd.DataFrame(rows)
-
-
-def process_usage_data(usage_response):
+def process_usage_data(usage_response: UsageReportResponse) -> pd.DataFrame:
     """Process usage response into pandas DataFrame"""
     if not usage_response or not usage_response.get("data"):
         return pd.DataFrame()
@@ -442,31 +100,37 @@ def process_usage_data(usage_response):
     return pd.DataFrame(rows)
 
 
-def process_cost_data(cost_response):
+def process_cost_data(cost_response: CostReportResponse) -> pd.DataFrame:
     """Process cost response into pandas DataFrame"""
     if not cost_response or not cost_response.get("data"):
         return pd.DataFrame()
 
-    rows = []
+    rows: list[CostDataRow] = []
     try:
         for time_bucket in cost_response["data"]:
             date = time_bucket["starting_at"][:10]  # Extract date part
 
             for result in time_bucket["results"]:
-                rows.append(
-                    {
-                        "date": date,
-                        "description": result.get("description", "Unknown"),
-                        "amount": float(result.get("amount", 0)),
-                        "currency": result.get("currency", "USD"),
-                        "model": result.get("model", "unknown"),
-                        "workspace_id": result.get("workspace_id", "unknown"),
-                        "api_key_id": result.get("api_key_id", "unknown"),
-                        "service_tier": result.get("service_tier", "standard"),
-                        "cost_type": result.get("cost_type", "tokens"),
-                        "token_type": result.get("token_type", "unknown"),
-                    }
-                )
+                # Extract values with proper type handling
+                amount_raw = result.get("amount", 0)
+                try:
+                    amount = float(amount_raw)
+                except (ValueError, TypeError):
+                    amount = 0.0
+
+                row: CostDataRow = {
+                    "date": date,
+                    "description": str(result.get("description", "Unknown")),
+                    "amount": amount,
+                    "currency": str(result.get("currency", "USD")),
+                    "model": str(result.get("model", "unknown")),
+                    "workspace_id": str(result.get("workspace_id", "unknown")),
+                    "api_key_id": str(result.get("api_key_id", "unknown")),
+                    "service_tier": str(result.get("service_tier", "standard")),
+                    "cost_type": str(result.get("cost_type", "tokens")),
+                    "token_type": str(result.get("token_type", "unknown")),
+                }
+                rows.append(row)
     except (KeyError, TypeError, ValueError) as e:
         print(f"Error processing cost data: {e}")
         return pd.DataFrame()
@@ -554,7 +218,11 @@ def server(input: Inputs, output: Outputs, session: Session):
             )
 
             usage_response = fetch_anthropic_usage_report(
-                start_date, end_date, bucket_width=granularity, limit=api_limit
+                ANTHROPIC_API_KEY,
+                start_date,
+                end_date,
+                bucket_width=granularity,
+                limit=api_limit,
             )
             df = process_usage_data(usage_response)
 
@@ -570,7 +238,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             return generate_demo_usage_data()
 
     @reactive.calc
-    def usage_data():
+    def usage_data() -> pd.DataFrame:
         """Apply filters to raw usage data"""
         df = raw_usage_data()
         if df.empty:
@@ -619,7 +287,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         return filtered_df
 
     @reactive.calc
-    def raw_cost_data():
+    def raw_cost_data() -> pd.DataFrame:
         """Fetch raw cost data from API or demo source"""
         try:
             start_date = (
@@ -662,7 +330,10 @@ def server(input: Inputs, output: Outputs, session: Session):
             print(f"Using cost API limit: {cost_limit} for {days_diff} days")
 
             cost_response = fetch_anthropic_cost_report(
-                start_date, end_date, limit=cost_limit
+                ANTHROPIC_API_KEY,
+                start_date,
+                end_date,
+                limit=cost_limit,
             )
             df = process_cost_data(cost_response)
 
@@ -678,7 +349,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             return generate_demo_cost_data()
 
     @reactive.calc
-    def cost_data():
+    def cost_data() -> pd.DataFrame:
         """Apply filters to raw cost data"""
         df = raw_cost_data()
         if df.empty:
@@ -735,7 +406,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             return generate_demo_workspace_data()
 
         try:
-            workspaces_response = fetch_workspaces()
+            workspaces_response = fetch_workspaces(api_key=ANTHROPIC_API_KEY)
             if workspaces_response and workspaces_response.get("data"):
                 return workspaces_response["data"]
         except Exception as e:
@@ -766,7 +437,8 @@ def server(input: Inputs, output: Outputs, session: Session):
 
         try:
             api_keys_response = fetch_api_keys(
-                workspace_filter if workspace_filter != "all" else None
+                ANTHROPIC_API_KEY,
+                workspace_filter if workspace_filter != "all" else None,
             )
             if api_keys_response and api_keys_response.get("data"):
                 return api_keys_response["data"]
@@ -781,8 +453,8 @@ def server(input: Inputs, output: Outputs, session: Session):
 
     # === FILTER OPTIONS ===
 
-    @render_object()
-    def available_workspaces():
+    @render_object
+    def available_workspaces() -> list[UiWorkspaceData]:
         """Get available workspaces with names and IDs, sorted by creation time"""
         df = raw_usage_data()
         if df.empty:
@@ -809,8 +481,8 @@ def server(input: Inputs, output: Outputs, session: Session):
         print(f"Returning workspace data from cache: {workspace_data}")
         return workspace_data
 
-    @render_object()
-    def available_api_keys():
+    @render_object
+    def available_api_keys() -> list[UiApiKeyData]:
         """Get available API keys with names and IDs, filtered by selected workspace, sorted by creation time"""
         df = raw_usage_data()
         if df.empty:
@@ -852,8 +524,8 @@ def server(input: Inputs, output: Outputs, session: Session):
         print(f"Returning API key data from cache: {api_key_data}")
         return api_key_data
 
-    @render_object()
-    def available_models():
+    @render_object
+    def available_models() -> list[str]:
         """Get available models from the data"""
         df = raw_usage_data()
         if df.empty:
@@ -867,8 +539,8 @@ def server(input: Inputs, output: Outputs, session: Session):
 
     # === API STATUS ===
 
-    @render_object()
-    def api_status():
+    @render_object
+    def api_status() -> UiApiStatus:
         """API connection status and info"""
         if not ANTHROPIC_API_KEY:
             return {
@@ -934,7 +606,7 @@ def server(input: Inputs, output: Outputs, session: Session):
 
     # === CHART DATA ===
 
-    @render_object()
+    @render_object
     def token_usage_chart_data():
         """Daily token usage over time"""
         df = usage_data()
@@ -955,7 +627,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         print(f"Token usage result: {result}")
         return result
 
-    @render_object()
+    @render_object
     def cost_by_model_chart_data():
         """Cost breakdown by model"""
         df = cost_data()
@@ -973,7 +645,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         print(f"Cost by model result: {result}")
         return result
 
-    @render_object()
+    @render_object
     def service_tier_chart_data():
         """Usage by service tier"""
         df = usage_data()
@@ -1002,7 +674,7 @@ def server(input: Inputs, output: Outputs, session: Session):
 
     # === DATA TABLE ===
 
-    @render_object()
+    @render_object
     def usage_table_data():
         """Detailed usage table data"""
         df = usage_data()
@@ -1020,7 +692,7 @@ def server(input: Inputs, output: Outputs, session: Session):
 
         return table_data.to_dict(orient="list")
 
-    @render_object()
+    @render_object
     def cost_table_data():
         """Detailed cost table data"""
         df = cost_data()
@@ -1035,26 +707,6 @@ def server(input: Inputs, output: Outputs, session: Session):
         )
 
         return table_data.to_dict(orient="list")
-
-    # === LEGACY SUPPORT (for existing components) ===
-
-    @render.text
-    def processed_text():
-        text = input.user_text() if input.user_text() is not None else ""
-        if text == "":
-            return ""
-        return "".join(reversed(text.upper()))
-
-    @render.text
-    def text_length():
-        text = input.user_text() if input.user_text() is not None else ""
-        return len(text)
-
-    @render.text
-    @reactive.event(input.button_trigger)
-    def button_response():
-        now = datetime.now()
-        return f"Refreshed at: {now.strftime('%Y-%m-%d %H:%M:%S')}"
 
     @render.plot()
     def plot1():

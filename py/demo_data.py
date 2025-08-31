@@ -1,0 +1,194 @@
+# pyright: strict
+from datetime import datetime, timedelta
+import numpy as np
+import pandas as pd
+from data_types import UsageDataRow, WorkspaceData, ApiKeyData, CostDataRow
+
+
+def generate_demo_usage_data() -> pd.DataFrame:
+    """Generate demo usage data when API is unavailable"""
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=7)
+
+    rows: list[UsageDataRow] = []
+    models = ["claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"]
+    service_tiers = ["standard", "batch"]
+    workspaces = ["ws_123abc", "ws_456def", "ws_789ghi"]
+    api_keys = [
+        "sk-ant-api03-123",
+        "sk-ant-api03-456",
+        "sk-ant-api03-789",
+        "sk-ant-api03-000",
+    ]
+
+    for i in range(7):
+        current_date = (start_date + timedelta(days=i)).strftime("%Y-%m-%d")
+        for model in models:
+            for tier in service_tiers:
+                for workspace in workspaces:
+                    # Each workspace has some API keys
+                    workspace_api_keys = (
+                        api_keys[:2]
+                        if workspace == "ws_123abc"
+                        else api_keys[1:3] if workspace == "ws_456def" else api_keys[2:]
+                    )
+                    for api_key in workspace_api_keys:
+                        input_tokens = np.random.randint(1000, 10000)
+                        output_tokens = np.random.randint(500, 3000)
+                        row: UsageDataRow = {
+                            "date": current_date,
+                            "model": model,
+                            "service_tier": tier,
+                            "workspace_id": workspace,
+                            "api_key_id": api_key,
+                            "input_tokens": input_tokens,
+                            "output_tokens": output_tokens,
+                            "cache_creation_1h": int(np.random.randint(0, 100)),
+                            "cache_creation_5m": int(np.random.randint(0, 50)),
+                            "web_search_requests": int(np.random.randint(0, 10)),
+                        }
+                        rows.append(row)
+
+    return pd.DataFrame(rows)
+
+
+def generate_demo_workspace_data() -> list[WorkspaceData]:
+    """Generate demo workspace metadata with timestamps, sorted by creation time (oldest first)"""
+    from datetime import datetime, timedelta
+
+    base_time = datetime.now()
+    workspaces: list[WorkspaceData] = [
+        {
+            "id": "ws_123abc",
+            "name": "Development Team",
+            "display_color": "#6C5BB9",
+            "created_at": (base_time - timedelta(days=1)).isoformat() + "Z",
+        },
+        {
+            "id": "ws_456def",
+            "name": "Production Environment",
+            "display_color": "#2E7D32",
+            "created_at": (base_time - timedelta(days=7)).isoformat() + "Z",
+        },
+        {
+            "id": "ws_789ghi",
+            "name": "Research & Analytics",
+            "display_color": "#F57C00",
+            "created_at": (base_time - timedelta(days=3)).isoformat() + "Z",
+        },
+        {
+            "id": "ws_oldformat",
+            "name": "",
+            "display_color": "#9E9E9E",
+            "created_at": (base_time - timedelta(days=30)).isoformat() + "Z",
+        },
+        {
+            "id": "default",
+            "name": "Default",
+            "display_color": "#757575",
+            "created_at": (base_time - timedelta(days=365)).isoformat() + "Z",
+        },
+    ]
+
+    # Sort by created_at (oldest first)
+    return sorted(workspaces, key=lambda x: x["created_at"], reverse=False)
+
+
+def generate_demo_api_key_data() -> list[ApiKeyData]:
+    """Generate demo API key metadata with timestamps, sorted by creation time (oldest first)"""
+    from datetime import datetime, timedelta
+
+    base_time = datetime.now()
+    api_keys: list[ApiKeyData] = [
+        {
+            "id": "sk-ant-api03-123",
+            "name": "Development Key",
+            "workspace_id": "ws_123abc",
+            "partial_key_hint": "sk-ant-api03-123...abc",
+            "created_at": (base_time - timedelta(hours=2)).isoformat() + "Z",
+        },
+        {
+            "id": "sk-ant-api03-456",
+            "name": "Production Key",
+            "workspace_id": "ws_456def",
+            "partial_key_hint": "sk-ant-api03-456...def",
+            "created_at": (base_time - timedelta(days=2)).isoformat() + "Z",
+        },
+        {
+            "id": "sk-ant-api03-789",
+            "name": "Analytics Key",
+            "workspace_id": "ws_789ghi",
+            "partial_key_hint": "sk-ant-api03-789...ghi",
+            "created_at": (base_time - timedelta(days=5)).isoformat() + "Z",
+        },
+        {
+            "id": "sk-ant-api03-000",
+            "name": "Backup Key",
+            "workspace_id": "ws_123abc",
+            "partial_key_hint": "sk-ant-api03-000...xyz",
+            "created_at": (base_time - timedelta(days=1)).isoformat() + "Z",
+        },
+        {
+            "id": "sk-ant-api03-legacy",
+            "name": "",
+            "workspace_id": "ws_oldformat",
+            "partial_key_hint": "sk-ant-api03-legacy...old",
+            "created_at": (base_time - timedelta(days=45)).isoformat() + "Z",
+        },
+        {
+            "id": "sk-ant-api03-default",
+            "name": "Default API Key",
+            "workspace_id": "default",
+            "partial_key_hint": "sk-ant-api03-default...xyz",
+            "created_at": (base_time - timedelta(days=400)).isoformat() + "Z",
+        },
+    ]
+
+    # Sort by created_at (oldest first)
+    return sorted(api_keys, key=lambda x: x["created_at"], reverse=False)
+
+
+def generate_demo_cost_data() -> pd.DataFrame:
+    """Generate demo cost data when API is unavailable"""
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=7)
+
+    rows: list[CostDataRow] = []
+    models = ["claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"]
+    descriptions = ["Input tokens", "Output tokens", "Cache creation"]
+    workspaces = ["ws_123abc", "ws_456def", "ws_789ghi"]
+    api_keys = [
+        "sk-ant-api03-123",
+        "sk-ant-api03-456",
+        "sk-ant-api03-789",
+        "sk-ant-api03-000",
+    ]
+
+    for i in range(7):
+        current_date = (start_date + timedelta(days=i)).strftime("%Y-%m-%d")
+        for model in models:
+            for desc in descriptions:
+                for workspace in workspaces:
+                    # Each workspace has some API keys
+                    workspace_api_keys = (
+                        api_keys[:2]
+                        if workspace == "ws_123abc"
+                        else api_keys[1:3] if workspace == "ws_456def" else api_keys[2:]
+                    )
+                    for api_key in workspace_api_keys:
+                        amount = np.random.uniform(0.50, 15.00)
+                        row: CostDataRow = {
+                            "date": current_date,
+                            "description": desc,
+                            "amount": float(amount),
+                            "currency": "USD",
+                            "model": model,
+                            "workspace_id": workspace,
+                            "api_key_id": api_key,
+                            "service_tier": "standard",
+                            "cost_type": "tokens",
+                            "token_type": "input" if "Input" in desc else "output",
+                        }
+                        rows.append(row)
+
+    return pd.DataFrame(rows)
