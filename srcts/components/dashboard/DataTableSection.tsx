@@ -1,9 +1,18 @@
-import React from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useShinyOutput } from "shiny-react";
+import { Info } from "lucide-react";
+import React from "react";
+import { useShinyInput, useShinyOutput } from "shiny-react";
 
 interface UsageData {
   date: string;
@@ -22,19 +31,39 @@ interface CostData {
 
 export function DataTableSection() {
   // Connect to Shiny outputs for usage and cost table data
-  const [usageTableDataRaw] = useShinyOutput<Record<string, any[]> | undefined>("usage_table_data", undefined);
-  const [costTableDataRaw] = useShinyOutput<Record<string, any[]> | undefined>("cost_table_data", undefined);
+  const [usageTableDataRaw] = useShinyOutput<Record<string, any[]> | undefined>(
+    "usage_table_data",
+    undefined
+  );
+  const [costTableDataRaw] = useShinyOutput<Record<string, any[]> | undefined>(
+    "cost_table_data",
+    undefined
+  );
+
+  // Get current filter state to show warnings
+  const [currentFilters] = useShinyOutput<{
+    workspace_id: string;
+    api_key_id: string;
+    model: string;
+    granularity: string;
+  }>("current_filters", {
+    workspace_id: "all",
+    api_key_id: "all",
+    model: "all",
+    granularity: "1d",
+  });
 
   // Convert column-major data to row-major for usage data
   const processUsageData = (): UsageData[] => {
     if (!usageTableDataRaw) return [];
-    
+
     const columnNames = Object.keys(usageTableDataRaw);
-    const numRows = columnNames.length > 0 ? usageTableDataRaw[columnNames[0]].length : 0;
+    const numRows =
+      columnNames.length > 0 ? usageTableDataRaw[columnNames[0]].length : 0;
 
     return Array.from({ length: numRows }, (_, rowIndex) => {
       const row: any = {};
-      columnNames.forEach(colName => {
+      columnNames.forEach((colName) => {
         row[colName] = usageTableDataRaw[colName][rowIndex];
       });
       return row as UsageData;
@@ -44,13 +73,14 @@ export function DataTableSection() {
   // Convert column-major data to row-major for cost data
   const processCostData = (): CostData[] => {
     if (!costTableDataRaw) return [];
-    
+
     const columnNames = Object.keys(costTableDataRaw);
-    const numRows = columnNames.length > 0 ? costTableDataRaw[columnNames[0]].length : 0;
+    const numRows =
+      columnNames.length > 0 ? costTableDataRaw[columnNames[0]].length : 0;
 
     return Array.from({ length: numRows }, (_, rowIndex) => {
       const row: any = {};
-      columnNames.forEach(colName => {
+      columnNames.forEach((colName) => {
         row[colName] = costTableDataRaw[colName][rowIndex];
       });
       return row as CostData;
@@ -61,11 +91,11 @@ export function DataTableSection() {
   const costRows = processCostData();
 
   const getModelColor = (model: string) => {
-    if (model.includes('sonnet')) {
+    if (model.includes("sonnet")) {
       return "bg-purple-100 text-purple-800 hover:bg-purple-200";
-    } else if (model.includes('haiku')) {
+    } else if (model.includes("haiku")) {
       return "bg-green-100 text-green-800 hover:bg-green-200";
-    } else if (model.includes('opus')) {
+    } else if (model.includes("opus")) {
       return "bg-blue-100 text-blue-800 hover:bg-blue-200";
     } else {
       return "bg-gray-100 text-gray-800 hover:bg-gray-200";
@@ -89,15 +119,15 @@ export function DataTableSection() {
         <CardTitle>API Usage & Cost Details</CardTitle>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="usage" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="usage">Token Usage</TabsTrigger>
-            <TabsTrigger value="cost">Cost Breakdown</TabsTrigger>
+        <Tabs defaultValue='usage' className='w-full'>
+          <TabsList className='grid w-full grid-cols-2'>
+            <TabsTrigger value='usage'>Token Usage</TabsTrigger>
+            <TabsTrigger value='cost'>Cost Breakdown</TabsTrigger>
           </TabsList>
-          
-          <TabsContent value="usage">
+
+          <TabsContent value='usage'>
             {usageRows.length > 0 ? (
-              <div className="rounded-md border">
+              <div className='rounded-md border'>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -112,22 +142,24 @@ export function DataTableSection() {
                   <TableBody>
                     {usageRows.map((row, index) => (
                       <TableRow key={`${row.date}-${row.model}-${index}`}>
-                        <TableCell className="font-medium">
+                        <TableCell className='font-medium'>
                           {new Date(row.date).toLocaleDateString()}
                         </TableCell>
                         <TableCell>
                           <Badge className={getModelColor(row.model)}>
-                            {row.model.replace('claude-', '')}
+                            {row.model.replace("claude-", "")}
                           </Badge>
                         </TableCell>
-                        <TableCell className="font-mono text-right">
+                        <TableCell className='font-mono text-right'>
                           {row.input_tokens.toLocaleString()}
                         </TableCell>
-                        <TableCell className="font-mono text-right">
+                        <TableCell className='font-mono text-right'>
                           {row.output_tokens.toLocaleString()}
                         </TableCell>
-                        <TableCell className="font-mono text-right font-semibold">
-                          {(row.input_tokens + row.output_tokens).toLocaleString()}
+                        <TableCell className='font-mono text-right font-semibold'>
+                          {(
+                            row.input_tokens + row.output_tokens
+                          ).toLocaleString()}
                         </TableCell>
                         <TableCell>
                           <Badge className={getTierColor(row.service_tier)}>
@@ -140,37 +172,47 @@ export function DataTableSection() {
                 </Table>
               </div>
             ) : (
-              <div className="text-center text-muted-foreground py-8">
+              <div className='text-center text-muted-foreground py-8'>
                 Loading usage data...
               </div>
             )}
           </TabsContent>
-          
-          <TabsContent value="cost">
+
+          <TabsContent value='cost'>
+            {currentFilters?.api_key_id !== "all" && (
+              <Alert className='mb-4'>
+                <Info className='h-4 w-4' />
+                <AlertDescription>
+                  <strong>Cost Limitation:</strong> Cost data shows
+                  workspace-level totals only. The Anthropic Cost API doesn't
+                  provide per-API-key breakdowns.
+                </AlertDescription>
+              </Alert>
+            )}
             {costRows.length > 0 ? (
-              <div className="rounded-md border">
+              <div className='rounded-md border'>
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Date</TableHead>
                       <TableHead>Description</TableHead>
                       <TableHead>Model</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead className='text-right'>Amount</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {costRows.map((row, index) => (
                       <TableRow key={`${row.date}-${row.description}-${index}`}>
-                        <TableCell className="font-medium">
+                        <TableCell className='font-medium'>
                           {new Date(row.date).toLocaleDateString()}
                         </TableCell>
                         <TableCell>{row.description}</TableCell>
                         <TableCell>
                           <Badge className={getModelColor(row.model)}>
-                            {row.model.replace('claude-', '')}
+                            {row.model.replace("claude-", "")}
                           </Badge>
                         </TableCell>
-                        <TableCell className="font-mono text-right font-semibold">
+                        <TableCell className='font-mono text-right font-semibold'>
                           ${row.amount.toFixed(4)}
                         </TableCell>
                       </TableRow>
@@ -179,7 +221,7 @@ export function DataTableSection() {
                 </Table>
               </div>
             ) : (
-              <div className="text-center text-muted-foreground py-8">
+              <div className='text-center text-muted-foreground py-8'>
                 Loading cost data...
               </div>
             )}

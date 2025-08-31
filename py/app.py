@@ -101,7 +101,7 @@ def process_usage_data(
                         "date": datetime_key,
                         "model": result.get("model", "unknown"),
                         "service_tier": result.get("service_tier", "standard"),
-                        "workspace_id": result.get("workspace_id", "unknown"),
+                        "workspace_id": result.get("workspace_id") or "default",
                         "api_key_id": result.get("api_key_id", "unknown"),
                         "input_tokens": result.get("uncached_input_tokens", 0)
                         + result.get("cache_read_input_tokens", 0),
@@ -167,7 +167,7 @@ def process_cost_data(
                     "amount": amount,
                     "currency": str(result.get("currency", "USD")),
                     "model": str(result.get("model", "unknown")),
-                    "workspace_id": str(result.get("workspace_id", "unknown")),
+                    "workspace_id": str(result.get("workspace_id") or "default"),
                     "api_key_id": str(result.get("api_key_id", "unknown")),
                     "service_tier": str(result.get("service_tier", "standard")),
                     "cost_type": str(result.get("cost_type", "tokens")),
@@ -594,9 +594,15 @@ def server(input: Inputs, output: Outputs, session: Session):
         if use_demo_mode:
             demo_keys = generate_demo_api_key_data()
             if workspace_filter != "all":
-                return [
-                    k for k in demo_keys if k.get("workspace_id") == workspace_filter
-                ]
+                if workspace_filter == "default":
+                    # For "default" workspace, return keys with null workspace_id
+                    return [k for k in demo_keys if k.get("workspace_id") is None]
+                else:
+                    return [
+                        k
+                        for k in demo_keys
+                        if k.get("workspace_id") == workspace_filter
+                    ]
             return demo_keys
 
         # If no API key and demo mode disabled, return empty list
@@ -604,12 +610,18 @@ def server(input: Inputs, output: Outputs, session: Session):
             return []
 
         try:
+            # For "default" workspace, we need to get all keys and filter client-side
+            # because the API doesn't support filtering by null workspace_id
             api_keys_response = fetch_api_keys(
                 ANTHROPIC_API_KEY,
-                workspace_filter if workspace_filter != "all" else None,
+                None if workspace_filter in ["all", "default"] else workspace_filter,
             )
             if api_keys_response and api_keys_response.get("data"):
-                return api_keys_response["data"]
+                api_keys = api_keys_response["data"]
+                if workspace_filter == "default":
+                    # Filter to only API keys with null workspace_id
+                    return [k for k in api_keys if k.get("workspace_id") is None]
+                return api_keys
         except Exception as e:
             print(f"Error in api_keys_metadata: {e}")
 
@@ -631,6 +643,14 @@ def server(input: Inputs, output: Outputs, session: Session):
         # Use cached metadata instead of making fresh API calls
         workspaces = workspaces_metadata()
         workspace_data = []
+
+        # Check if we have a "default" workspace (for API keys with null workspace_id)
+        has_default_workspace = "default" in workspace_ids
+        if has_default_workspace:
+            workspace_data.append({"id": "default", "name": "Default"})
+            workspace_ids.remove(
+                "default"
+            )  # Remove from list to avoid processing again
 
         for ws in workspaces:
             if ws["id"] in workspace_ids:
@@ -829,6 +849,24 @@ def server(input: Inputs, output: Outputs, session: Session):
             return input.filter_granularity() or "1d"
         except:
             return "1d"
+
+    @render_object
+    def current_filters():
+        """Return current filter state for components to show warnings"""
+        try:
+            return {
+                "workspace_id": input.filter_workspace_id() or "all",
+                "api_key_id": input.filter_api_key_id() or "all",
+                "model": input.filter_model() or "all",
+                "granularity": input.filter_granularity() or "1d",
+            }
+        except:
+            return {
+                "workspace_id": "all",
+                "api_key_id": "all",
+                "model": "all",
+                "granularity": "1d",
+            }
 
     # === CHART DATA ===
 

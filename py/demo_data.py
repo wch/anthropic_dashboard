@@ -13,12 +13,15 @@ def generate_demo_usage_data(granularity: str = "1d") -> pd.DataFrame:
     rows: list[UsageDataRow] = []
     models = ["claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"]
     service_tiers = ["standard", "batch"]
-    workspaces = ["ws_123abc", "ws_456def", "ws_789ghi"]
+    workspaces = ["ws_123abc", "ws_456def", "ws_789ghi", "default"]
     api_keys = [
         "sk-ant-api03-123",
         "sk-ant-api03-456",
         "sk-ant-api03-789",
         "sk-ant-api03-000",
+        "apikey_01FGG6VMYwTs852ZvwBm957Q",
+        "apikey_01H7Wwfkf1pCo13i3f2tn933",
+        "apikey_01M2Ub8nT2eTXCsbxvaFjVPa",
     ]
 
     # Generate time points based on granularity
@@ -43,7 +46,15 @@ def generate_demo_usage_data(granularity: str = "1d") -> pd.DataFrame:
                     workspace_api_keys = (
                         api_keys[:2]
                         if workspace == "ws_123abc"
-                        else api_keys[1:3] if workspace == "ws_456def" else api_keys[2:]
+                        else (
+                            api_keys[1:3]
+                            if workspace == "ws_456def"
+                            else (
+                                api_keys[2:4]
+                                if workspace == "ws_789ghi"
+                                else api_keys[4:]
+                            )
+                        )  # default workspace gets the null workspace_id keys
                     )
                     for api_key in workspace_api_keys:
                         # Adjust token amounts based on granularity
@@ -151,17 +162,32 @@ def generate_demo_api_key_data() -> list[ApiKeyData]:
         },
         {
             "id": "sk-ant-api03-legacy",
-            "name": "",
+            "name": "Test Key",
             "workspace_id": "ws_oldformat",
             "partial_key_hint": "sk-ant-api03-legacy...old",
             "created_at": (base_time - timedelta(days=45)).isoformat() + "Z",
         },
+        # API keys with null workspace_id (matching the user's example)
         {
-            "id": "sk-ant-api03-default",
-            "name": "Default API Key",
-            "workspace_id": "default",
-            "partial_key_hint": "sk-ant-api03-default...xyz",
-            "created_at": (base_time - timedelta(days=400)).isoformat() + "Z",
+            "id": "apikey_01FGG6VMYwTs852ZvwBm957Q",
+            "name": "Application Key",
+            "workspace_id": None,
+            "partial_key_hint": "sk-ant-api03-vsc...1AAA",
+            "created_at": (base_time - timedelta(days=120)).isoformat() + "Z",
+        },
+        {
+            "id": "apikey_01H7Wwfkf1pCo13i3f2tn933",
+            "name": "Personal Assistant Key",
+            "workspace_id": None,
+            "partial_key_hint": "sk-ant-api03-Xaa...yQAA",
+            "created_at": (base_time - timedelta(days=90)).isoformat() + "Z",
+        },
+        {
+            "id": "apikey_01M2Ub8nT2eTXCsbxvaFjVPa",
+            "name": "Mobile App Integration",
+            "workspace_id": None,
+            "partial_key_hint": "sk-ant-api03-hCc...IwAA",
+            "created_at": (base_time - timedelta(days=80)).isoformat() + "Z",
         },
     ]
 
@@ -171,7 +197,7 @@ def generate_demo_api_key_data() -> list[ApiKeyData]:
 
 def generate_demo_cost_data(granularity: str = "1d") -> pd.DataFrame:
     """Generate demo cost data when API is unavailable
-    
+
     Note: Cost reports are always daily granularity according to Anthropic API,
     so we ignore the granularity parameter and always generate daily data.
     """
@@ -181,12 +207,15 @@ def generate_demo_cost_data(granularity: str = "1d") -> pd.DataFrame:
     rows: list[CostDataRow] = []
     models = ["claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"]
     descriptions = ["Input tokens", "Output tokens", "Cache creation"]
-    workspaces = ["ws_123abc", "ws_456def", "ws_789ghi"]
+    workspaces = ["ws_123abc", "ws_456def", "ws_789ghi", "default"]
     api_keys = [
         "sk-ant-api03-123",
         "sk-ant-api03-456",
         "sk-ant-api03-789",
         "sk-ant-api03-000",
+        "apikey_01FGG6VMYwTs852ZvwBm957Q",
+        "apikey_01H7Wwfkf1pCo13i3f2tn933",
+        "apikey_01M2Ub8nT2eTXCsbxvaFjVPa",
     ]
 
     # Cost reports are always daily - ignore granularity parameter
@@ -203,7 +232,15 @@ def generate_demo_cost_data(granularity: str = "1d") -> pd.DataFrame:
                     workspace_api_keys = (
                         api_keys[:2]
                         if workspace == "ws_123abc"
-                        else api_keys[1:3] if workspace == "ws_456def" else api_keys[2:]
+                        else (
+                            api_keys[1:3]
+                            if workspace == "ws_456def"
+                            else (
+                                api_keys[2:4]
+                                if workspace == "ws_789ghi"
+                                else api_keys[4:]
+                            )
+                        )  # default workspace gets the null workspace_id keys
                     )
                     for api_key in workspace_api_keys:
                         # Cost reports are always daily amounts

@@ -1,4 +1,6 @@
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Info } from "lucide-react";
 import React from "react";
 import {
   Bar,
@@ -15,7 +17,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { useShinyOutput } from "shiny-react";
+import { useShinyInput, useShinyOutput } from "shiny-react";
 import { ErrorState } from "../ErrorState";
 
 interface TokenUsageData {
@@ -57,6 +59,19 @@ export function ChartsSection() {
 
   // Get current granularity setting to format dates appropriately
   const [granularity] = useShinyOutput<string>("current_granularity", "1d");
+
+  // Get current filter state to show warnings
+  const [currentFilters] = useShinyOutput<{
+    workspace_id: string;
+    api_key_id: string;
+    model: string;
+    granularity: string;
+  }>("current_filters", {
+    workspace_id: "all",
+    api_key_id: "all",
+    model: "all",
+    granularity: "1d",
+  });
 
   // Check API status to determine if we should show error state
   const [apiStatus] = useShinyOutput<{
@@ -254,6 +269,16 @@ export function ChartsSection() {
           <CardTitle>Cost Breakdown by Model</CardTitle>
         </CardHeader>
         <CardContent>
+          {currentFilters?.api_key_id !== "all" && (
+            <Alert className='mb-4'>
+              <Info className='h-4 w-4' />
+              <AlertDescription>
+                <strong>Note:</strong> Cost data shows workspace-level totals.
+                Individual API key cost breakdowns are not available from the
+                Anthropic API.
+              </AlertDescription>
+            </Alert>
+          )}
           <ResponsiveContainer width='100%' height={300}>
             <BarChart data={costByModelData}>
               <CartesianGrid strokeDasharray='3 3' />
