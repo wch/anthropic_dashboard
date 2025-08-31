@@ -1,7 +1,7 @@
 # pyright: strict
 # pyright: reportUnusedFunction=false
 
-from typing import TypedDict, Tuple, Literal
+from typing import TypedDict, Literal
 from shiny import App, Inputs, Outputs, Session, ui, render, reactive
 from shinyreact import page_bare, render_object
 from pathlib import Path
