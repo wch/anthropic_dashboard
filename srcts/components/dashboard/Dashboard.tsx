@@ -6,7 +6,6 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { StatsCards } from "./StatsCards";
 import { ChartsSection } from "./ChartsSection";
 import { DataTableSection } from "./DataTableSection";
-import { DateRangeSelector } from "./DateRangeSelector";
 import { FilterControls } from "./FilterControls";
 import { PlotCard } from "../PlotCard";
 
@@ -37,13 +36,8 @@ export function Dashboard() {
           {/* Filter Controls */}
           <FilterControls />
           
-          {/* Date Range Selector and KPI Stats */}
-          <div className="grid gap-6 lg:grid-cols-3">
-            <DateRangeSelector />
-            <div className="lg:col-span-2">
-              <StatsCards />
-            </div>
-          </div>
+          {/* KPI Stats */}
+          <StatsCards />
 
           {/* Charts Section */}
           <ChartsSection />
