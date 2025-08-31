@@ -7,7 +7,7 @@
     "build": "concurrently \"tsc --noEmit\" \"tsx build.ts\"",
     "watch": "concurrently \"tsc --noEmit --watch\" \"tsx build.ts --watch\"",
     "build-prod": "tsc --noEmit && tsx build.ts --production",
-    "clean": "rm -rf r/www py/www build"
+    "clean": "rm -rf py/www build"
   },
   "author": "Winston Chang",
   "license": "MIT",

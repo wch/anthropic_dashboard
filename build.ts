@@ -8,21 +8,6 @@ const metafile = process.argv.includes("--metafile");
 
 async function main() {
   const buildmap = {
-    r: esbuild.context({
-      entryPoints: ["srcts/main.tsx"],
-      outfile: "r/www/main.js",
-      bundle: true,
-      format: "esm",
-      minify: production,
-      sourcemap: production ? undefined : "linked",
-      sourcesContent: true,
-      alias: {
-        react: "react",
-      },
-      logLevel: "info",
-      metafile: metafile,
-      plugins: [tailwindPlugin()],
-    }),
     py: esbuild.context({
       entryPoints: ["srcts/main.tsx"],
       outfile: "py/www/main.js",
