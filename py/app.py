@@ -61,7 +61,9 @@ else:
     print("✓ Anthropic API key found. Dashboard will fetch live data.")
 
 
-def process_usage_data(usage_response: UsageReportResponse) -> pd.DataFrame:
+def process_usage_data(
+    usage_response: UsageReportResponse, granularity: str = "1d"
+) -> pd.DataFrame:
     """Process usage response into pandas DataFrame"""
     if not usage_response or not usage_response.get("data"):
         return pd.DataFrame()
@@ -69,12 +71,22 @@ def process_usage_data(usage_response: UsageReportResponse) -> pd.DataFrame:
     rows = []
     try:
         for time_bucket in usage_response["data"]:
-            date = time_bucket["starting_at"][:10]  # Extract date part
+            # Preserve timestamp granularity based on the granularity setting
+            starting_at = time_bucket["starting_at"]
+            if granularity == "1h":
+                # For hourly, preserve date and hour (YYYY-MM-DD HH:00)
+                datetime_key = starting_at[:13] + ":00"
+            elif granularity in ["1d", "7d", "30d"]:
+                # For daily and longer periods, use date only
+                datetime_key = starting_at[:10]
+            else:
+                # Fallback to date only
+                datetime_key = starting_at[:10]
 
             for result in time_bucket["results"]:
                 rows.append(
                     {
-                        "date": date,
+                        "date": datetime_key,
                         "model": result.get("model", "unknown"),
                         "service_tier": result.get("service_tier", "standard"),
                         "workspace_id": result.get("workspace_id", "unknown"),
@@ -100,7 +112,9 @@ def process_usage_data(usage_response: UsageReportResponse) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def process_cost_data(cost_response: CostReportResponse) -> pd.DataFrame:
+def process_cost_data(
+    cost_response: CostReportResponse, granularity: str = "1d"
+) -> pd.DataFrame:
     """Process cost response into pandas DataFrame"""
     if not cost_response or not cost_response.get("data"):
         return pd.DataFrame()
@@ -108,7 +122,19 @@ def process_cost_data(cost_response: CostReportResponse) -> pd.DataFrame:
     rows: list[CostDataRow] = []
     try:
         for time_bucket in cost_response["data"]:
-            date = time_bucket["starting_at"][:10]  # Extract date part
+            # Preserve timestamp granularity based on the granularity setting
+            starting_at = time_bucket["starting_at"]
+            if granularity == "1h":
+                # For hourly, preserve date and hour (YYYY-MM-DD HH:00)
+                datetime_key = starting_at[:13] + ":00"
+            elif granularity in ["1d", "7d", "30d"]:
+                # For daily and longer periods, use date only
+                datetime_key = starting_at[:10]
+            else:
+                # Fallback to date only
+                datetime_key = starting_at[:10]
+
+            date = datetime_key
 
             for result in time_bucket["results"]:
                 # Extract values with proper type handling
@@ -191,7 +217,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         if not ANTHROPIC_API_KEY:
             # Return demo data when API key is not available
             print("Using demo usage data (no API key)")
-            return generate_demo_usage_data()
+            return generate_demo_usage_data(granularity)
 
         try:
             # Calculate appropriate limit based on granularity and date range
@@ -224,18 +250,18 @@ def server(input: Inputs, output: Outputs, session: Session):
                 bucket_width=granularity,
                 limit=api_limit,
             )
-            df = process_usage_data(usage_response)
+            df = process_usage_data(usage_response, granularity)
 
             # If API call succeeded but returned empty data, use demo data
             if df.empty:
                 print("No usage data returned from API, using demo data")
-                return generate_demo_usage_data()
+                return generate_demo_usage_data(granularity)
 
             print(f"Returning real usage data with {len(df)} rows")
             return df
         except Exception as e:
             print(f"Error in raw_usage_data: {e}, using demo data")
-            return generate_demo_usage_data()
+            return generate_demo_usage_data(granularity)
 
     @reactive.calc
     def usage_data() -> pd.DataFrame:
@@ -312,7 +338,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         if not ANTHROPIC_API_KEY:
             # Return demo data when API key is not available
             print("Using demo cost data (no API key)")
-            return generate_demo_cost_data()
+            return generate_demo_cost_data(granularity)
 
         try:
             # Calculate appropriate limit for cost data based on date range
@@ -329,24 +355,35 @@ def server(input: Inputs, output: Outputs, session: Session):
 
             print(f"Using cost API limit: {cost_limit} for {days_diff} days")
 
+            # Get granularity for cost data consistency
+            try:
+                granularity = (
+                    input.filter_granularity()
+                    if hasattr(input, "filter_granularity")
+                    and input.filter_granularity() is not None
+                    else "1d"
+                )
+            except:
+                granularity = "1d"
+
             cost_response = fetch_anthropic_cost_report(
                 ANTHROPIC_API_KEY,
                 start_date,
                 end_date,
                 limit=cost_limit,
             )
-            df = process_cost_data(cost_response)
+            df = process_cost_data(cost_response, granularity)
 
             # If API call succeeded but returned empty data, use demo data
             if df.empty:
                 print("No cost data returned from API, using demo data")
-                return generate_demo_cost_data()
+                return generate_demo_cost_data(granularity)
 
             print(f"Returning real cost data with {len(df)} rows")
             return df
         except Exception as e:
             print(f"Error in raw_cost_data: {e}, using demo data")
-            return generate_demo_cost_data()
+            return generate_demo_cost_data(granularity)
 
     @reactive.calc
     def cost_data() -> pd.DataFrame:

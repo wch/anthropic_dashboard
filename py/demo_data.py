@@ -5,7 +5,7 @@ import pandas as pd
 from data_types import UsageDataRow, WorkspaceData, ApiKeyData, CostDataRow
 
 
-def generate_demo_usage_data() -> pd.DataFrame:
+def generate_demo_usage_data(granularity: str = "1d") -> pd.DataFrame:
     """Generate demo usage data when API is unavailable"""
     end_date = datetime.now()
     start_date = end_date - timedelta(days=7)
@@ -21,8 +21,21 @@ def generate_demo_usage_data() -> pd.DataFrame:
         "sk-ant-api03-000",
     ]
 
-    for i in range(7):
-        current_date = (start_date + timedelta(days=i)).strftime("%Y-%m-%d")
+    # Generate time points based on granularity
+    time_points = []
+    if granularity == "1h":
+        # Generate hourly data points for the last 3 days
+        current_time = end_date - timedelta(days=3)
+        while current_time <= end_date:
+            time_points.append(current_time.strftime("%Y-%m-%d %H:00"))
+            current_time += timedelta(hours=1)
+    else:
+        # Generate daily data points (default behavior)
+        for i in range(7):
+            current_date = (start_date + timedelta(days=i)).strftime("%Y-%m-%d")
+            time_points.append(current_date)
+
+    for time_point in time_points:
         for model in models:
             for tier in service_tiers:
                 for workspace in workspaces:
@@ -33,10 +46,18 @@ def generate_demo_usage_data() -> pd.DataFrame:
                         else api_keys[1:3] if workspace == "ws_456def" else api_keys[2:]
                     )
                     for api_key in workspace_api_keys:
-                        input_tokens = np.random.randint(1000, 10000)
-                        output_tokens = np.random.randint(500, 3000)
+                        # Adjust token amounts based on granularity
+                        if granularity == "1h":
+                            # Hourly data should be smaller amounts
+                            input_tokens = np.random.randint(100, 1000)
+                            output_tokens = np.random.randint(50, 500)
+                        else:
+                            # Daily data - larger amounts
+                            input_tokens = np.random.randint(1000, 10000)
+                            output_tokens = np.random.randint(500, 3000)
+
                         row: UsageDataRow = {
-                            "date": current_date,
+                            "date": time_point,
                             "model": model,
                             "service_tier": tier,
                             "workspace_id": workspace,
@@ -148,7 +169,7 @@ def generate_demo_api_key_data() -> list[ApiKeyData]:
     return sorted(api_keys, key=lambda x: x["created_at"], reverse=False)
 
 
-def generate_demo_cost_data() -> pd.DataFrame:
+def generate_demo_cost_data(granularity: str = "1d") -> pd.DataFrame:
     """Generate demo cost data when API is unavailable"""
     end_date = datetime.now()
     start_date = end_date - timedelta(days=7)
@@ -164,8 +185,21 @@ def generate_demo_cost_data() -> pd.DataFrame:
         "sk-ant-api03-000",
     ]
 
-    for i in range(7):
-        current_date = (start_date + timedelta(days=i)).strftime("%Y-%m-%d")
+    # Generate time points based on granularity
+    time_points = []
+    if granularity == "1h":
+        # Generate hourly data points for the last 3 days
+        current_time = end_date - timedelta(days=3)
+        while current_time <= end_date:
+            time_points.append(current_time.strftime("%Y-%m-%d %H:00"))
+            current_time += timedelta(hours=1)
+    else:
+        # Generate daily data points (default behavior)
+        for i in range(7):
+            current_date = (start_date + timedelta(days=i)).strftime("%Y-%m-%d")
+            time_points.append(current_date)
+
+    for time_point in time_points:
         for model in models:
             for desc in descriptions:
                 for workspace in workspaces:
@@ -176,9 +210,16 @@ def generate_demo_cost_data() -> pd.DataFrame:
                         else api_keys[1:3] if workspace == "ws_456def" else api_keys[2:]
                     )
                     for api_key in workspace_api_keys:
-                        amount = np.random.uniform(0.50, 15.00)
+                        # Adjust cost amounts based on granularity
+                        if granularity == "1h":
+                            # Hourly costs should be smaller
+                            amount = np.random.uniform(0.05, 1.50)
+                        else:
+                            # Daily costs - larger amounts
+                            amount = np.random.uniform(0.50, 15.00)
+
                         row: CostDataRow = {
-                            "date": current_date,
+                            "date": time_point,
                             "description": desc,
                             "amount": float(amount),
                             "currency": "USD",
