@@ -608,7 +608,7 @@ function DataTableCard() {
 
 *Python Backend*:
 ```python
-@render_object()
+@render_object
 def table_data():
     num_rows = input.table_rows()
     # This produces a JSON object in column-major format, as in:
@@ -636,7 +636,7 @@ class render_object(Renderer[Jsonifiable]):
         return value
 
 # In app.py
-@render_object()
+@render_object
 def table_stats():
     num_rows = input.table_rows()
     mtcars_subset = mtcars.head(num_rows)
@@ -987,7 +987,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         return input.txtin().upper()
 
     # Complex data output using render_object
-    @render_object()
+    @render_object
     def table_data():
         num_rows = input.table_rows()
         return mtcars.head(num_rows).to_dict(orient="list")
