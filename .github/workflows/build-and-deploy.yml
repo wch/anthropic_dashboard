@@ -1,0 +1,52 @@
+name: Build and Deploy to Build Branch
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for all branches
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Build project
+      run: npm run build
+    
+    - name: Configure Git
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+    
+    - name: Create and switch to build branch
+      run: |
+        git checkout -B build
+    
+    - name: Add built files
+      run: |
+        git add -f py/www
+    
+    - name: Commit changes
+      run: |
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "Build: Deploy built files from commit ${{ github.sha }}"
+        fi
+    
+    - name: Push to build branch
+      run: |
+        git push -f origin build
