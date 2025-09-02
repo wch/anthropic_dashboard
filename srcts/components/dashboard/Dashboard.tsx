@@ -7,7 +7,6 @@ import { StatsCards } from "./StatsCards";
 import { ChartsSection } from "./ChartsSection";
 import { DataTableSection } from "./DataTableSection";
 import { PlotCard } from "../PlotCard";
-import { DemoModeToggle } from "../DemoModeToggle";
 import { ToastSystem } from "../ToastSystem";
 
 export function Dashboard() {
@@ -30,11 +29,6 @@ export function Dashboard() {
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
-          </div>
-          
-          {/* Demo Mode Toggle in Header */}
-          <div className="ml-auto px-4">
-            <DemoModeToggle />
           </div>
         </header>
 

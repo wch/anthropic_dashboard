@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 import * as React from "react";
 
-import { Badge } from "@/components/ui/badge";
 import {
   Sidebar,
   SidebarContent,
@@ -25,8 +24,7 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { AlertTriangle, CheckCircle, XCircle } from "lucide-react";
-import { useShinyOutput } from "shiny-react";
+import { DemoModeToggle } from "../DemoModeToggle";
 import { FiltersSidebar } from "./FiltersSidebar";
 import { NavMain } from "./nav-main";
 import { NavProjects } from "./nav-projects";
@@ -159,89 +157,12 @@ const data = {
   ],
 };
 
-function ApiStatus() {
-  const [apiStatus] = useShinyOutput<
-    | {
-        status: "connected" | "demo" | "error";
-        message: string;
-        last_update?: string;
-      }
-    | undefined
-  >("api_status", undefined);
-
-  if (!apiStatus) {
-    return (
-      <div className='px-3 py-2 border-t'>
-        <div className='flex items-center space-x-2 text-xs'>
-          <div className='h-2 w-2 bg-gray-400 rounded-full animate-pulse'></div>
-          <span className='text-muted-foreground'>Checking API...</span>
-        </div>
-      </div>
-    );
-  }
-
-  const getStatusIcon = () => {
-    switch (apiStatus.status) {
-      case "connected":
-        return <CheckCircle className='h-3 w-3 text-green-600' />;
-      case "demo":
-        return <AlertTriangle className='h-3 w-3 text-yellow-600' />;
-      case "error":
-        return <XCircle className='h-3 w-3 text-red-600' />;
-      default:
-        return <div className='h-2 w-2 bg-gray-400 rounded-full'></div>;
-    }
-  };
-
-  const getStatusColor = () => {
-    switch (apiStatus.status) {
-      case "connected":
-        return "bg-green-100 text-green-800 hover:bg-green-200";
-      case "demo":
-        return "bg-yellow-100 text-yellow-800 hover:bg-yellow-200";
-      case "error":
-        return "bg-red-100 text-red-800 hover:bg-red-200";
-      default:
-        return "bg-gray-100 text-gray-800 hover:bg-gray-200";
-    }
-  };
-
-  const getStatusText = () => {
-    switch (apiStatus.status) {
-      case "connected":
-        return "Live Data";
-      case "demo":
-        return "Demo Data";
-      case "error":
-        return "API Error";
-      default:
-        return "Unknown";
-    }
-  };
-
-  return (
-    <div className='px-3 py-2 border-t'>
-      <div className='flex items-center space-x-2 mb-1'>
-        {getStatusIcon()}
-        <Badge className={`${getStatusColor()} text-xs py-0 px-1`}>
-          {getStatusText()}
-        </Badge>
-      </div>
-      {apiStatus.status !== "connected" && (
-        <p className='text-xs text-muted-foreground leading-tight'>
-          {apiStatus.message}
-        </p>
-      )}
-    </div>
-  );
-}
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible='icon' {...props}>
       <SidebarHeader>
         <TeamSwitcher teams={data.teams} />
-        <ApiStatus />
       </SidebarHeader>
       <SidebarContent>
         <div className='mb-auto'>
@@ -250,7 +171,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         {/* <NavMain items={data.navMain} /> */}
         {/* <NavProjects projects={data.projects} /> */}
       </SidebarContent>
-      <SidebarFooter>{/* <NavUser user={data.user} /> */}</SidebarFooter>
+      <SidebarFooter>
+        <div className='px-3 py-2 border-t'>
+          <DemoModeToggle />
+        </div>
+        {/* <NavUser user={data.user} /> */}
+      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );
