@@ -25,6 +25,8 @@ import { CalendarIcon, ChevronDown, Filter } from "lucide-react";
 import React from "react";
 import { useShinyInput, useShinyOutput } from "shiny-react";
 
+const DEFAULT_DATE_RANGE = 30;
+
 export function FiltersSidebar() {
   // Input controls for filtering
   const [selectedWorkspace, setSelectedWorkspace] = useShinyInput<string>(
@@ -65,17 +67,17 @@ export function FiltersSidebar() {
   const [isFiltersOpen, setIsFiltersOpen] = React.useState(true);
   const [isDateRangeOpen, setIsDateRangeOpen] = React.useState(true);
 
-  // Initialize with default date range (last 7 days)
+  // Initialize with default date range
   React.useEffect(() => {
     const today = new Date();
-    const lastWeek = new Date();
-    lastWeek.setDate(today.getDate() - 7);
+    const startDate = new Date();
+    startDate.setDate(today.getDate() - DEFAULT_DATE_RANGE);
 
-    setStartDateObj(lastWeek);
+    setStartDateObj(startDate);
     setEndDateObj(today);
 
     // Send ISO format to Shiny backend
-    setStartDate(lastWeek.toISOString().split("T")[0] + "T00:00:00Z");
+    setStartDate(startDate.toISOString().split("T")[0] + "T00:00:00Z");
     setEndDate(today.toISOString().split("T")[0] + "T23:59:59Z");
   }, [setStartDate, setEndDate]);
 
