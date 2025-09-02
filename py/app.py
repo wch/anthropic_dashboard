@@ -936,6 +936,380 @@ def server(input: Inputs, output: Outputs, session: Session):
         print(f"Service tier result: {chart_result}")
         return chart_result
 
+    @render_object
+    def workspace_cost_chart_data():
+        """Cost breakdown by workspace"""
+        df = cost_data()
+        print(
+            f"Workspace cost chart data - df shape: {df.shape if not df.empty else 'empty'}"
+        )
+        if df.empty:
+            print("Returning empty workspace cost data")
+            return {"workspace": [], "cost": []}
+
+        try:
+            # Group by workspace_id to get costs per workspace
+            workspace_costs = df.groupby("workspace_id")["amount"].sum().reset_index()
+            workspace_costs.columns = ["workspace_id", "cost"]
+
+            # Try to get workspace metadata to map IDs to names
+            try:
+                workspaces_meta = workspaces_metadata()
+                workspace_lookup = {ws["id"]: ws for ws in workspaces_meta}
+                print(f"Successfully loaded {len(workspaces_meta)} workspaces metadata")
+            except Exception as meta_error:
+                print(f"Warning: Could not load workspaces metadata: {meta_error}")
+                workspace_lookup = {}
+
+            # Map workspace IDs to names and add creation times for sorting
+            def get_workspace_info(wid):
+                if wid in workspace_lookup:
+                    return {
+                        "name": workspace_lookup[wid]["name"]
+                        or f"Workspace {wid[-6:]}",
+                        "created_at": workspace_lookup[wid]["created_at"],
+                    }
+                elif wid == "default":
+                    return {"name": "Default", "created_at": "1970-01-01T00:00:00Z"}
+                else:
+                    return {
+                        "name": f"Workspace {wid[-6:]}",
+                        "created_at": "1970-01-01T00:00:00Z",
+                    }
+
+            workspace_costs["workspace_info"] = workspace_costs["workspace_id"].apply(
+                get_workspace_info
+            )
+            workspace_costs["workspace"] = workspace_costs["workspace_info"].apply(
+                lambda x: x["name"]
+            )
+            workspace_costs["created_at"] = workspace_costs["workspace_info"].apply(
+                lambda x: x["created_at"]
+            )
+
+            # Sort by creation time (oldest first)
+            workspace_costs = workspace_costs.sort_values("created_at")
+
+            result = workspace_costs[["workspace", "cost"]].to_dict(orient="list")
+            print(f"Workspace cost result: {result}")
+            return result
+        except Exception as e:
+            print(f"Error in workspace_cost_chart_data: {e}")
+            import traceback
+
+            traceback.print_exc()
+            return {"workspace": [], "cost": []}
+
+    @render_object
+    def workspace_cost_table_data():
+        """Detailed workspace cost table with totals and token usage"""
+        cost_df = cost_data()
+        usage_df = usage_data()
+        print(
+            f"Workspace cost table data - cost_df shape: {cost_df.shape if not cost_df.empty else 'empty'}, usage_df shape: {usage_df.shape if not usage_df.empty else 'empty'}"
+        )
+
+        if cost_df.empty and usage_df.empty:
+            print("Returning empty workspace cost table data - no cost or usage data")
+            return {
+                "workspace": [],
+                "cost": [],
+                "input_tokens": [],
+                "output_tokens": [],
+                "total_tokens": [],
+                "creation_time": [],
+                "total": 0,
+            }
+
+        try:
+            # Get workspace metadata to map IDs to names and creation times
+            try:
+                workspaces_meta = workspaces_metadata()
+                workspace_lookup = {ws["id"]: ws for ws in workspaces_meta}
+                print(
+                    f"Successfully loaded {len(workspaces_meta)} workspaces metadata for cost table"
+                )
+            except Exception as meta_error:
+                print(
+                    f"Warning: Could not load workspaces metadata for cost table: {meta_error}"
+                )
+                workspace_lookup = {}
+
+            # Combine cost and usage data by workspace
+            results = []
+
+            # Get all workspace IDs from both datasets
+            workspace_ids = set()
+            if not cost_df.empty:
+                workspace_ids.update(cost_df["workspace_id"].unique())
+            if not usage_df.empty:
+                workspace_ids.update(usage_df["workspace_id"].unique())
+
+            for workspace_id in workspace_ids:
+                # Get cost for this workspace
+                workspace_cost = 0
+                if not cost_df.empty:
+                    workspace_cost_df = cost_df[cost_df["workspace_id"] == workspace_id]
+                    workspace_cost = (
+                        workspace_cost_df["amount"].sum()
+                        if not workspace_cost_df.empty
+                        else 0
+                    )
+
+                # Get token usage for this workspace
+                input_tokens = 0
+                output_tokens = 0
+                if not usage_df.empty:
+                    workspace_usage_df = usage_df[
+                        usage_df["workspace_id"] == workspace_id
+                    ]
+                    if not workspace_usage_df.empty:
+                        input_tokens = workspace_usage_df["input_tokens"].sum()
+                        output_tokens = workspace_usage_df["output_tokens"].sum()
+
+                total_tokens = input_tokens + output_tokens
+
+                # Get workspace info
+                if workspace_id in workspace_lookup:
+                    workspace_name = (
+                        workspace_lookup[workspace_id]["name"]
+                        or f"Workspace {workspace_id[-6:]}"
+                    )
+                    created_at = workspace_lookup[workspace_id]["created_at"]
+                elif workspace_id == "default":
+                    workspace_name = "Default"
+                    created_at = "1970-01-01T00:00:00Z"
+                else:
+                    workspace_name = f"Workspace {workspace_id[-6:]}"
+                    created_at = "1970-01-01T00:00:00Z"
+
+                results.append(
+                    {
+                        "workspace": workspace_name,
+                        "cost": float(workspace_cost),
+                        "input_tokens": int(input_tokens),
+                        "output_tokens": int(output_tokens),
+                        "total_tokens": int(total_tokens),
+                        "created_at": created_at,
+                    }
+                )
+
+            # Sort by creation time (oldest first) - default sorting
+            results.sort(key=lambda x: x["created_at"])
+
+            # Calculate total cost
+            total_cost = sum(r["cost"] for r in results)
+
+            # Convert to column-major format
+            result = {
+                "workspace": [r["workspace"] for r in results],
+                "cost": [r["cost"] for r in results],
+                "input_tokens": [r["input_tokens"] for r in results],
+                "output_tokens": [r["output_tokens"] for r in results],
+                "total_tokens": [r["total_tokens"] for r in results],
+                "creation_time": [r["created_at"] for r in results],
+                "total": float(total_cost),
+            }
+            print(f"Workspace cost table result: {result}")
+            return result
+        except Exception as e:
+            print(f"Error in workspace_cost_table_data: {e}")
+            import traceback
+
+            traceback.print_exc()
+            return {
+                "workspace": [],
+                "cost": [],
+                "input_tokens": [],
+                "output_tokens": [],
+                "total_tokens": [],
+                "creation_time": [],
+                "total": 0,
+            }
+
+    @render_object
+    def api_key_usage_chart_data():
+        """Token usage breakdown by API key"""
+        df = usage_data()
+        print(
+            f"API key usage chart data - df shape: {df.shape if not df.empty else 'empty'}"
+        )
+        if df.empty:
+            print("Returning empty API key usage data")
+            return {"api_key": [], "tokens": []}
+
+        try:
+            # Group by api_key_id to get token usage per API key
+            api_key_usage = (
+                df.groupby("api_key_id")
+                .agg({"input_tokens": "sum", "output_tokens": "sum"})
+                .reset_index()
+            )
+
+            api_key_usage["total_tokens"] = (
+                api_key_usage["input_tokens"] + api_key_usage["output_tokens"]
+            )
+
+            # Get API key metadata to map IDs to names
+            api_keys_meta = api_keys_metadata()
+            api_key_lookup = {key["id"]: key for key in api_keys_meta}
+
+            # Map API key IDs to names and add creation times for sorting
+            def get_api_key_info(kid):
+                if kid in api_key_lookup:
+                    return {
+                        "name": api_key_lookup[kid]["name"] or f"API Key {kid[-6:]}",
+                        "created_at": api_key_lookup[kid]["created_at"],
+                    }
+                else:
+                    return {
+                        "name": f"API Key {kid[-6:]}",
+                        "created_at": "1970-01-01T00:00:00Z",
+                    }
+
+            api_key_usage["api_key_info"] = api_key_usage["api_key_id"].apply(
+                get_api_key_info
+            )
+            api_key_usage["api_key"] = api_key_usage["api_key_info"].apply(
+                lambda x: x["name"]
+            )
+            api_key_usage["created_at"] = api_key_usage["api_key_info"].apply(
+                lambda x: x["created_at"]
+            )
+
+            # Sort by creation time (oldest first)
+            api_key_usage = api_key_usage.sort_values("created_at")
+
+            result = api_key_usage[["api_key", "total_tokens"]].copy()
+            result.columns = ["api_key", "tokens"]
+            chart_result = result.to_dict(orient="list")
+            print(f"API key usage result: {chart_result}")
+            return chart_result
+        except Exception as e:
+            print(f"Error in api_key_usage_chart_data: {e}")
+            return {"api_key": [], "tokens": []}
+
+    @render_object
+    def api_key_usage_table_data():
+        """Detailed API key usage table with workspace information"""
+        df = usage_data()
+        print(
+            f"API key usage table data - df shape: {df.shape if not df.empty else 'empty'}"
+        )
+        if df.empty:
+            print("Returning empty API key usage table data")
+            return {
+                "api_key": [],
+                "workspace": [],
+                "input_tokens": [],
+                "output_tokens": [],
+                "total_tokens": [],
+                "creation_time": [],
+            }
+
+        try:
+            # Group by api_key_id to get detailed token usage per API key
+            api_key_usage = (
+                df.groupby(["api_key_id", "workspace_id"])
+                .agg({"input_tokens": "sum", "output_tokens": "sum"})
+                .reset_index()
+            )
+
+            api_key_usage["total_tokens"] = (
+                api_key_usage["input_tokens"] + api_key_usage["output_tokens"]
+            )
+
+            # Get API key metadata to map IDs to names and creation times
+            try:
+                api_keys_meta = api_keys_metadata()
+                api_key_lookup = {key["id"]: key for key in api_keys_meta}
+                print(
+                    f"Successfully loaded {len(api_keys_meta)} API keys metadata for usage table"
+                )
+            except Exception as meta_error:
+                print(
+                    f"Warning: Could not load API keys metadata for usage table: {meta_error}"
+                )
+                api_key_lookup = {}
+
+            # Get workspace metadata to map workspace IDs to names
+            try:
+                workspaces_meta = workspaces_metadata()
+                workspace_lookup = {ws["id"]: ws for ws in workspaces_meta}
+                print(
+                    f"Successfully loaded {len(workspaces_meta)} workspaces metadata for usage table"
+                )
+            except Exception as meta_error:
+                print(
+                    f"Warning: Could not load workspaces metadata for usage table: {meta_error}"
+                )
+                workspace_lookup = {}
+
+            # Map API key IDs to names and add creation times
+            def get_api_key_info(kid):
+                if kid in api_key_lookup:
+                    return {
+                        "name": api_key_lookup[kid]["name"] or f"API Key {kid[-6:]}",
+                        "created_at": api_key_lookup[kid]["created_at"],
+                    }
+                else:
+                    return {
+                        "name": f"API Key {kid[-6:]}",
+                        "created_at": "1970-01-01T00:00:00Z",
+                    }
+
+            # Map workspace IDs to names
+            def get_workspace_name(wid):
+                if wid in workspace_lookup:
+                    return workspace_lookup[wid]["name"] or f"Workspace {wid[-6:]}"
+                elif wid == "default":
+                    return "Default"
+                else:
+                    return f"Workspace {wid[-6:]}"
+
+            api_key_usage["api_key_info"] = api_key_usage["api_key_id"].apply(
+                get_api_key_info
+            )
+            api_key_usage["api_key"] = api_key_usage["api_key_info"].apply(
+                lambda x: x["name"]
+            )
+            api_key_usage["created_at"] = api_key_usage["api_key_info"].apply(
+                lambda x: x["created_at"]
+            )
+            api_key_usage["workspace"] = api_key_usage["workspace_id"].apply(
+                get_workspace_name
+            )
+
+            # Sort by creation time (oldest first) - default sorting
+            api_key_usage = api_key_usage.sort_values("created_at")
+
+            result = api_key_usage[
+                [
+                    "api_key",
+                    "workspace",
+                    "input_tokens",
+                    "output_tokens",
+                    "total_tokens",
+                    "created_at",
+                ]
+            ].to_dict(orient="list")
+            result["creation_time"] = result.pop("created_at")  # Rename for consistency
+            print(f"API key usage table result: {result}")
+            return result
+        except Exception as e:
+            print(f"Error in api_key_usage_table_data: {e}")
+            import traceback
+
+            traceback.print_exc()
+            return {
+                "api_key": [],
+                "workspace": [],
+                "input_tokens": [],
+                "output_tokens": [],
+                "total_tokens": [],
+                "creation_time": [],
+            }
+
     # === DATA TABLE ===
 
     @render_object
