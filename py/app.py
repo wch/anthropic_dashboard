@@ -6,6 +6,7 @@ from shiny import App, Inputs, Outputs, Session, ui, render, reactive
 from shinyreact import page_bare, render_object
 from pathlib import Path
 import pandas as pd
+import matplotlib
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 import os
@@ -25,6 +26,9 @@ from demo_data import (
     generate_demo_api_key_data,
 )
 from data_types import CostDataRow
+
+# Use non-interactive backend so that Matplotlib app doesn't open on Mac
+matplotlib.use("Agg")
 
 
 class UiWorkspaceData(TypedDict):
