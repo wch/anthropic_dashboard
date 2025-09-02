@@ -553,48 +553,6 @@ export function ChartsSection() {
       </Card>
 
       {/* Cost by Model Bar Chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Cost Breakdown by Model</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {currentFilters?.api_key_id !== "all" && (
-            <Alert className='mb-4'>
-              <Info className='h-4 w-4' />
-              <AlertDescription>
-                <strong>Note:</strong> Cost data shows workspace-level totals.
-                Individual API key cost breakdowns are not available from the
-                Anthropic API.
-              </AlertDescription>
-            </Alert>
-          )}
-          <ResponsiveContainer width='100%' height={300}>
-            <BarChart data={costByModelData}>
-              <CartesianGrid strokeDasharray='3 3' />
-              <XAxis
-                dataKey='model'
-                angle={-45}
-                textAnchor='end'
-                height={140}
-              />
-              <YAxis
-                tickFormatter={(value) => `$${value.toFixed(2)}`}
-                width={100}
-              />
-              <Tooltip
-                formatter={(value: any) => [`$${value.toFixed(4)}`, "Cost"]}
-                labelFormatter={(label) => `Model: ${label}`}
-              />
-              <Bar
-                dataKey='cost'
-                fill='#16a34a'
-                radius={[4, 4, 0, 0]}
-                animationDuration={300}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
 
       {/* Workspace Cost Bar Chart */}
       <Card>
@@ -878,6 +836,49 @@ export function ChartsSection() {
               No API key usage data available
             </p>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Cost Breakdown by Model</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {currentFilters?.api_key_id !== "all" && (
+            <Alert className='mb-4'>
+              <Info className='h-4 w-4' />
+              <AlertDescription>
+                <strong>Note:</strong> Cost data shows workspace-level totals.
+                Individual API key cost breakdowns are not available from the
+                Anthropic API.
+              </AlertDescription>
+            </Alert>
+          )}
+          <ResponsiveContainer width='100%' height={300}>
+            <BarChart data={costByModelData}>
+              <CartesianGrid strokeDasharray='3 3' />
+              <XAxis
+                dataKey='model'
+                angle={-45}
+                textAnchor='end'
+                height={140}
+              />
+              <YAxis
+                tickFormatter={(value) => `$${value.toFixed(2)}`}
+                width={100}
+              />
+              <Tooltip
+                formatter={(value: any) => [`$${value.toFixed(4)}`, "Cost"]}
+                labelFormatter={(label) => `Model: ${label}`}
+              />
+              <Bar
+                dataKey='cost'
+                fill='#16a34a'
+                radius={[4, 4, 0, 0]}
+                animationDuration={300}
+              />
+            </BarChart>
+          </ResponsiveContainer>
         </CardContent>
       </Card>
     </div>

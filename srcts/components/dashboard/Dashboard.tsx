@@ -6,7 +6,6 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { StatsCards } from "./StatsCards";
 import { ChartsSection } from "./ChartsSection";
 import { DataTableSection } from "./DataTableSection";
-import { FilterControls } from "./FilterControls";
 import { PlotCard } from "../PlotCard";
 import { DemoModeToggle } from "../DemoModeToggle";
 import { ToastSystem } from "../ToastSystem";
@@ -40,9 +39,6 @@ export function Dashboard() {
         </header>
 
         <div className="flex flex-1 flex-col gap-6 p-4 pt-0">
-          {/* Filter Controls */}
-          <FilterControls />
-          
           {/* KPI Stats */}
           <StatsCards />
 
