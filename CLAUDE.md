@@ -26,8 +26,13 @@ This is a Shiny-React dashboard application for Anthropic API usage analytics. I
 ```
 test/
 ├── package.json            # Build configuration and npm dependencies
-├── tsconfig.json           # TypeScript configuration
+├── tsconfig.json           # TypeScript configuration with path aliases
+├── build.ts                # Custom build script for Tailwind CSS processing
+├── components.json         # shadcn/ui configuration
 ├── CLAUDE.md               # This file - instructions for LLM coding agents
+├── TODO.md                 # Project todo list
+├── .env                    # Environment variables (API keys)
+├── .mcp.json               # MCP server configuration
 ├── anthropic-docs/         # Anthropic API documentation
 │   ├── INDEX.md            # **API DOCUMENTATION INDEX - START HERE**
 │   ├── get-messages-usage-report.md  # Usage reporting API
@@ -37,23 +42,71 @@ test/
 │   └── [other API docs]    # Additional API documentation
 ├── srcts/                  # React TypeScript source code
 │   ├── main.tsx            # React app entry point
-│   ├── components/         # React components
-│   │   ├── App.tsx         # Main application component
-│   │   ├── dashboard/      # Dashboard-specific components
-│   │   │   ├── Dashboard.tsx        # Main dashboard layout
-│   │   │   ├── FilterControls.tsx   # Advanced filtering interface
-│   │   │   ├── ChartsSection.tsx    # Data visualization charts
-│   │   │   ├── DataTableSection.tsx # Usage/cost data tables
-│   │   │   ├── StatsCards.tsx       # KPI statistics cards
-│   │   │   └── DateRangeSelector.tsx # Date range controls
-│   │   └── ui/             # shadcn/ui components
-│   └── styles.css          # CSS styling
+│   ├── globals.css         # Global styles and CSS variables
+│   ├── css.d.ts            # CSS modules type definitions
+│   ├── lib/
+│   │   └── utils.ts        # Utility functions (includes cn helper)
+│   ├── hooks/
+│   │   └── use-mobile.ts   # Custom React hooks
+│   └── components/         # React components
+│       ├── App.tsx         # Main application component (renders Dashboard)
+│       ├── dashboard/      # Dashboard-specific components
+│       │   ├── Dashboard.tsx         # Main dashboard layout with sidebar
+│       │   ├── app-sidebar.tsx       # Application sidebar component
+│       │   ├── nav-main.tsx          # Main navigation component
+│       │   ├── nav-projects.tsx      # Projects navigation
+│       │   ├── nav-user.tsx          # User navigation
+│       │   ├── team-switcher.tsx     # Team/workspace switcher
+│       │   ├── FiltersSidebar.tsx    # Filters sidebar component
+│       │   ├── FilterControls.tsx    # Advanced filtering interface
+│       │   ├── ChartsSection.tsx     # Data visualization charts using Recharts
+│       │   ├── DataTableSection.tsx  # Usage/cost data tables with @tanstack/react-table
+│       │   ├── StatsCards.tsx        # KPI statistics cards
+│       │   ├── DateRangeSelector.tsx # Date range controls
+│       │   └── ApiStatusCard.tsx     # API connection status display
+│       ├── DemoModeToggle.tsx        # Toggle between demo and live data
+│       ├── ToastSystem.tsx           # Toast notification system
+│       ├── ErrorState.tsx            # Error state component
+│       ├── PlotCard.tsx              # Generic plot card component
+│       ├── TextInputCard.tsx         # Text input example component
+│       ├── ButtonEventCard.tsx       # Button event example component
+│       └── ui/                       # shadcn/ui components
+│           ├── alert.tsx
+│           ├── avatar.tsx
+│           ├── badge.tsx
+│           ├── breadcrumb.tsx
+│           ├── button.tsx
+│           ├── calendar.tsx
+│           ├── card.tsx
+│           ├── chart.tsx
+│           ├── collapsible.tsx
+│           ├── dropdown-menu.tsx
+│           ├── input.tsx
+│           ├── label.tsx
+│           ├── popover.tsx
+│           ├── select.tsx
+│           ├── separator.tsx
+│           ├── sheet.tsx
+│           ├── sidebar.tsx
+│           ├── skeleton.tsx
+│           ├── sonner.tsx
+│           ├── switch.tsx
+│           ├── table.tsx
+│           ├── tabs.tsx
+│           └── tooltip.tsx
 └── py/                     # Python Shiny backend
     ├── app.py              # Main Python Shiny application with API integration
-    ├── shinyreact.py       # Python functions for shiny-react
+    ├── shinyreact.py       # Python functions for shiny-react (page_bare, render_object)
+    ├── anthropic_api.py    # Anthropic API client functions
+    ├── data_types.py       # TypedDict definitions for API responses
+    ├── demo_data.py        # Demo data generation functions
+    ├── requirements.txt    # Python dependencies
+    ├── .posit/             # Posit deployment configuration
     └── www/                # Built JavaScript/CSS output (auto-generated)
         ├── main.js         # Compiled React code for Python backend
-        └── main.css        # Compiled CSS for Python backend
+        ├── main.js.map     # Source map for debugging
+        ├── main.css        # Compiled CSS with Tailwind
+        └── main.css.map    # CSS source map
 ```
 
 ## Key Files and Their Purpose
@@ -67,27 +120,55 @@ test/
 
 ### Frontend (React/TypeScript)
 - **`srcts/main.tsx`**: Entry point that mounts the React app to the DOM
-- **`srcts/components/App.tsx`**: Main application component with dashboard layout
+- **`srcts/globals.css`**: Global styles and Tailwind CSS variables
+- **`srcts/lib/utils.ts`**: Utility functions including the `cn` helper for class merging
+- **`srcts/hooks/use-mobile.ts`**: Custom React hook for mobile breakpoint detection
+- **`srcts/components/App.tsx`**: Main application component (renders Dashboard component)
 - **`srcts/components/dashboard/`**: Dashboard-specific components:
+  - **`Dashboard.tsx`**: Main dashboard layout with sidebar navigation and breadcrumb
+  - **`app-sidebar.tsx`**: Application sidebar with navigation and team switcher
+  - **`nav-main.tsx`**, **`nav-projects.tsx`**, **`nav-user.tsx`**: Sidebar navigation components
+  - **`team-switcher.tsx`**: Team/workspace switcher dropdown
+  - **`FiltersSidebar.tsx`**: Dedicated sidebar for filters
   - **`FilterControls.tsx`**: Advanced filtering interface (workspace, API key, model, granularity)
   - **`ChartsSection.tsx`**: Data visualization using Recharts (token usage, cost analysis)
-  - **`DataTableSection.tsx`**: Tabular data display with sorting and filtering
-  - **`StatsCards.tsx`**: KPI metrics and statistics display
+  - **`DataTableSection.tsx`**: Tabular data display with @tanstack/react-table
+  - **`StatsCards.tsx`**: KPI metrics and statistics display cards
   - **`DateRangeSelector.tsx`**: Date range picker with presets
-- **`srcts/components/ui/`**: shadcn/ui component library (buttons, cards, tables, etc.)
+  - **`ApiStatusCard.tsx`**: API connection status indicator
+- **`srcts/components/DemoModeToggle.tsx`**: Toggle between live API and demo data
+- **`srcts/components/ToastSystem.tsx`**: Toast notification system using sonner
+- **`srcts/components/ErrorState.tsx`**: Error boundary and error display component
+- **`srcts/components/PlotCard.tsx`**: Generic plot card component for charts
+- **`srcts/components/TextInputCard.tsx`**, **`ButtonEventCard.tsx`**: Example shiny-react components
+- **`srcts/components/ui/`**: Complete shadcn/ui component library with modern styling
 
 ### Backend (Python Shiny)
-- **`py/app.py`**: Main Python Shiny application with Anthropic API integration
-  - Live API data fetching with fallback to demo data
-  - Advanced filtering and grouping logic
-  - Real-time reactive calculations
-- **`py/shinyreact.py`**: Utility functions for bare page setup and custom renderers
-- **`py/www/`**: Auto-generated build output (JavaScript and CSS bundles)
+- **`py/app.py`**: Main Python Shiny application with comprehensive Anthropic API integration
+  - Live API data fetching with intelligent fallback to demo data
+  - Advanced filtering and grouping logic with reactive calculations
+  - Data transformation and aggregation for dashboard consumption
+- **`py/anthropic_api.py`**: Dedicated Anthropic API client functions
+  - HTTP request handling with authentication
+  - Response parsing and error handling
+  - API endpoint wrapper functions
+- **`py/data_types.py`**: TypedDict definitions for API responses and internal data structures
+- **`py/demo_data.py`**: Realistic demo data generation functions for development/testing
+- **`py/shinyreact.py`**: Utility functions for shiny-react integration
+  - `page_bare()` for custom page layout without default Shiny styling
+  - `render_object()` custom renderer for arbitrary JSON data
+- **`py/requirements.txt`**: Python dependencies for API integration and data processing
+- **`py/.posit/`**: Posit Connect deployment configuration
+- **`py/www/`**: Auto-generated build output with source maps and Tailwind CSS compilation
 
 ### Configuration & Documentation
-- **`package.json`**: Build scripts, dependencies, and project configuration
-- **`tsconfig.json`**: TypeScript configuration with path aliases for components
-- **`components.json`**: shadcn/ui configuration for component management
+- **`package.json`**: Build scripts, dependencies, and project configuration with modern tools
+- **`tsconfig.json`**: TypeScript configuration with path aliases (`@/*`) for clean imports
+- **`components.json`**: shadcn/ui configuration for component management and theming
+- **`build.ts`**: Custom build script with Tailwind CSS processing and watch mode
+- **`.env`**: Environment variables for API keys and configuration
+- **`.mcp.json`**: Model Context Protocol server configuration for AI assistance
+- **`TODO.md`**: Project task tracking and development notes
 
 ## Build Commands
 
@@ -96,11 +177,17 @@ test/
 # Install dependencies
 npm install
 
-# Development with hot reload
+# Development with hot reload (includes TypeScript checking + Tailwind CSS compilation)
 npm run watch
 
 # One-time build
 npm run build
+
+# Production build with optimization
+npm run build-prod
+
+# Clean build artifacts
+npm run clean
 ```
 
 ## Running the Application
@@ -120,11 +207,11 @@ npm run build
 
 ## Anthropic API Integration
 
-This application integrates with the Anthropic Admin API to provide real-time usage and cost analytics. 
+This application integrates with the Anthropic Admin API to provide real-time usage and cost analytics.
 
 ### **📖 API Documentation Reference**
 - **Primary Reference**: See `anthropic-docs/INDEX.md` for complete API documentation index
-- **Key Endpoints**: 
+- **Key Endpoints**:
   - `get-messages-usage-report.md` - Usage statistics with filtering
   - `get-cost-report.md` - Cost analysis and billing data
   - `list-workspaces.md` - Workspace management
@@ -147,7 +234,7 @@ FilterControls ──[filters]──> Python Backend ──[API calls]──> An
      ▼                              ▼                              ▼
  User selects:              Applies filters:              Returns data:
  - Workspace                - workspace_id                - Usage stats
- - API Key                  - api_key_id                  - Cost data  
+ - API Key                  - api_key_id                  - Cost data
  - Model                    - model filter                - Grouped by filters
  - Granularity              - bucket_width                - Time-bucketed
      │                              │                              │
@@ -159,7 +246,7 @@ Dashboard Updates ◀─[processed data]─◀ Data Processing ◀─[raw JSON]�
 The dashboard implements cascading filters that mirror the API's grouping capabilities:
 
 1. **Workspace Filter**: Filters all data by workspace_id
-2. **API Key Filter**: Dynamically updates based on selected workspace  
+2. **API Key Filter**: Dynamically updates based on selected workspace
 3. **Model Filter**: Filters by specific model names
 4. **Granularity**: Controls time bucket width (1h, 1d, 7d, 30d)
 
@@ -283,11 +370,43 @@ shiny run py/app.py --port 8001
 - **`.py`**: Python Shiny server files
 
 ## Key Dependencies
+
+### Core Dependencies
 - **shiny-react**: Core library for React-Shiny communication
-- **react + react-dom**: React framework
+- **react + react-dom**: React 19.1.1 framework
 - **typescript**: TypeScript compiler and type checking
-- **esbuild**: Fast JavaScript bundling
+
+### Build & Development Tools
+- **esbuild**: Fast JavaScript bundling and compilation
+- **tsx**: TypeScript execution for build scripts
 - **concurrently**: Run multiple npm scripts simultaneously
+- **chokidar**: File watching for hot reload
+- **tailwindcss**: Utility-first CSS framework
+- **esbuild-plugin-tailwindcss**: Tailwind CSS integration for esbuild
+
+### UI & Styling
+- **@radix-ui/***: Headless UI primitives (17+ components)
+- **shadcn**: CLI tool for component management
+- **lucide-react**: Icon library
+- **class-variance-authority**: Utility for component variants
+- **clsx + tailwind-merge**: Class name utilities
+
+### Data & Charts
+- **recharts**: Chart library for data visualization
+- **@tanstack/react-table**: Powerful table component
+- **date-fns**: Date utility library
+- **react-day-picker**: Date picker component
+
+### Notifications & UI State
+- **sonner**: Toast notification library
+- **next-themes**: Theme management (dark/light mode)
+
+### Python Backend
+- **shiny**: Python Shiny framework
+- **pandas**: Data manipulation and analysis
+- **matplotlib**: Plotting library
+- **python-dotenv**: Environment variable management
+- **httpx**: HTTP client for API requests
 
 ---
 
