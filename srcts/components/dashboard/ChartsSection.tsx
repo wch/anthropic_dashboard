@@ -117,7 +117,7 @@ export function ChartsSection() {
       | "total_tokens"
       | "creation_time";
     direction: "asc" | "desc";
-  }>({ column: "creation_time", direction: "asc" });
+  }>({ column: "cost", direction: "desc" });
 
   const [apiKeyTableSort, setApiKeyTableSort] = React.useState<{
     column:
@@ -128,7 +128,7 @@ export function ChartsSection() {
       | "total_tokens"
       | "creation_time";
     direction: "asc" | "desc";
-  }>({ column: "creation_time", direction: "asc" });
+  }>({ column: "total_tokens", direction: "desc" });
 
   // Connect to Shiny outputs for Anthropic API chart data
   const [tokenUsageDataRaw] = useShinyOutput<any>("token_usage_chart_data", {});
