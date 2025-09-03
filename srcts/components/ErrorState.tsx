@@ -1,9 +1,9 @@
-import React from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useShinyInput } from "@posit/shiny-react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
-import { useShinyInput } from "shiny-react";
+import React from "react";
 
 interface ErrorStateProps {
   title?: string;
@@ -38,35 +38,31 @@ export function ErrorState({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <AlertTriangle className="h-5 w-5 text-destructive" />
+        <CardTitle className='flex items-center gap-2'>
+          <AlertTriangle className='h-5 w-5 text-destructive' />
           {title}
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className='space-y-4'>
         <Alert>
-          <AlertTriangle className="h-4 w-4" />
+          <AlertTriangle className='h-4 w-4' />
           <AlertDescription>{message}</AlertDescription>
         </Alert>
 
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className='flex flex-col sm:flex-row gap-2'>
           {showDemoModeButton && (
-            <Button 
+            <Button
               onClick={handleEnableDemoMode}
-              variant="default"
-              className="flex-1"
+              variant='default'
+              className='flex-1'
             >
               View Demo Data
             </Button>
           )}
-          
+
           {showRetryButton && (
-            <Button
-              onClick={handleRetry}
-              variant="outline"
-              className="flex-1"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
+            <Button onClick={handleRetry} variant='outline' className='flex-1'>
+              <RefreshCw className='h-4 w-4 mr-2' />
               Retry
             </Button>
           )}

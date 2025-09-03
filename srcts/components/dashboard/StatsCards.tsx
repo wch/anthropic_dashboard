@@ -4,9 +4,9 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useShinyOutput } from "@posit/shiny-react";
 import { Activity, Cpu, DollarSign, Info, Zap } from "lucide-react";
 import React from "react";
-import { useShinyOutput } from "shiny-react";
 import { ErrorState } from "../ErrorState";
 
 export function StatsCards() {

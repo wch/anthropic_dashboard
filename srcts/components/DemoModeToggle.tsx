@@ -1,17 +1,20 @@
-import React from "react";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { AlertTriangle, CheckCircle, XCircle, HelpCircle } from "lucide-react";
-import { useShinyInput, useShinyOutput } from "shiny-react";
+import { Switch } from "@/components/ui/switch";
+import { useShinyInput, useShinyOutput } from "@posit/shiny-react";
+import { AlertTriangle, CheckCircle, HelpCircle, XCircle } from "lucide-react";
+import React from "react";
 
 export function DemoModeToggle() {
-  const [demoMode, setDemoMode] = useShinyInput<boolean>("use_demo_mode", false);
+  const [demoMode, setDemoMode] = useShinyInput<boolean>(
+    "use_demo_mode",
+    false
+  );
   const [apiStatus] = useShinyOutput<{
     status: string;
     message: string;
@@ -29,7 +32,9 @@ export function DemoModeToggle() {
     }
 
     if (!apiStatus) {
-      return <div className='h-2 w-2 bg-gray-400 rounded-full animate-pulse'></div>;
+      return (
+        <div className='h-2 w-2 bg-gray-400 rounded-full animate-pulse'></div>
+      );
     }
 
     switch (apiStatus.status) {
@@ -73,42 +78,47 @@ export function DemoModeToggle() {
     if (!apiStatus) return "Loading...";
 
     switch (apiStatus.status) {
-      case "connected": return "Live Data";
-      case "partial": return "Partial Data";
-      case "error": return "API Error";
-      case "demo": return "Demo Data";
-      default: return apiStatus.status;
+      case "connected":
+        return "Live Data";
+      case "partial":
+        return "Partial Data";
+      case "error":
+        return "API Error";
+      case "demo":
+        return "Demo Data";
+      default:
+        return apiStatus.status;
     }
   };
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
+    <div className='space-y-3'>
+      <div className='flex items-center justify-between'>
+        <div className='flex items-center space-x-2'>
           <Switch
-            id="demo-mode"
+            id='demo-mode'
             checked={demoMode}
             onCheckedChange={handleToggle}
           />
-          <Label htmlFor="demo-mode" className="text-sm font-medium">
+          <Label htmlFor='demo-mode' className='text-sm font-medium'>
             Use Demo Data
           </Label>
         </div>
         <Popover>
           <PopoverTrigger asChild>
-            <HelpCircle className="h-3 w-3 text-muted-foreground hover:text-foreground cursor-pointer" />
+            <HelpCircle className='h-3 w-3 text-muted-foreground hover:text-foreground cursor-pointer' />
           </PopoverTrigger>
-          <PopoverContent className="w-64 text-sm" side="left" align="start">
+          <PopoverContent className='w-64 text-sm' side='left' align='start'>
             <p>
-              When enabled, displays sample data instead of live API data.
-              Use this when the Anthropic API is unavailable or to preview
-              dashboard functionality.
+              When enabled, displays sample data instead of live API data. Use
+              this when the Anthropic API is unavailable or to preview dashboard
+              functionality.
             </p>
           </PopoverContent>
         </Popover>
       </div>
 
-      <div className="flex items-center space-x-2">
+      <div className='flex items-center space-x-2'>
         {getStatusIcon()}
         <Badge className={`${getBadgeColor()} text-xs py-0 px-1`}>
           {getStatusText()}

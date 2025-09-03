@@ -10,9 +10,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useShinyInput, useShinyOutput } from "@posit/shiny-react";
 import { Info } from "lucide-react";
 import React from "react";
-import { useShinyInput, useShinyOutput } from "shiny-react";
 
 interface UsageData {
   date: string;

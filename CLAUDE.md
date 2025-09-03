@@ -275,7 +275,7 @@ React Component <──[useShinyOutput]── Shiny Server
 
 #### React Component Pattern
 ```typescript
-import { useShinyInput, useShinyOutput } from "shiny-react";
+import { useShinyInput, useShinyOutput } from "@posit/shiny-react";
 
 function MyComponent() {
   // Send data to Shiny (like useState but syncs with server)
@@ -561,7 +561,7 @@ function ImageOutput({
 
 **Usage**:
 ```typescript
-import { ImageOutput } from "shiny-react";
+import { ImageOutput } from "@posit/shiny-react";
 
 function PlotCard() {
   return (
@@ -1317,7 +1317,7 @@ const [stats] = useShinyOutput<TableStats>("table_stats", undefined);
 **Import Errors**:
 ```typescript
 // Correct imports for shiny-react
-import { useShinyInput, useShinyOutput, ImageOutput } from "shiny-react";
+import { useShinyInput, useShinyOutput, ImageOutput } from "@posit/shiny-react";
 
 // Verify package.json has correct dependency
 // "dependencies": { "shiny-react": "file:../path/to/shiny-react" }

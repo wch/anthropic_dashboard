@@ -8,6 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useShinyInput, useShinyOutput } from "@posit/shiny-react";
 import { ChevronDown, ChevronUp, Info } from "lucide-react";
 import React from "react";
 import {
@@ -25,7 +26,6 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { useShinyInput, useShinyOutput } from "shiny-react";
 import { ErrorState } from "../ErrorState";
 
 interface TokenUsageData {

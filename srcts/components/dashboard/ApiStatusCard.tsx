@@ -1,28 +1,31 @@
-import React from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useShinyOutput } from "shiny-react";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useShinyOutput } from "@posit/shiny-react";
 import { AlertTriangle, CheckCircle, XCircle } from "lucide-react";
+import React from "react";
 
 export function ApiStatusCard() {
   // Connect to a Shiny output that indicates API status
-  const [apiStatus] = useShinyOutput<{
-    status: "connected" | "demo" | "error";
-    message: string;
-    last_update?: string;
-  } | undefined>("api_status", undefined);
+  const [apiStatus] = useShinyOutput<
+    | {
+        status: "connected" | "demo" | "error";
+        message: string;
+        last_update?: string;
+      }
+    | undefined
+  >("api_status", undefined);
 
   if (!apiStatus) {
     return (
       <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">API Status</CardTitle>
+        <CardHeader className='pb-2'>
+          <CardTitle className='text-sm font-medium'>API Status</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center space-x-2">
-            <div className="h-2 w-2 bg-gray-400 rounded-full animate-pulse"></div>
-            <span className="text-sm text-muted-foreground">Checking...</span>
+          <div className='flex items-center space-x-2'>
+            <div className='h-2 w-2 bg-gray-400 rounded-full animate-pulse'></div>
+            <span className='text-sm text-muted-foreground'>Checking...</span>
           </div>
         </CardContent>
       </Card>
@@ -32,13 +35,13 @@ export function ApiStatusCard() {
   const getStatusIcon = () => {
     switch (apiStatus.status) {
       case "connected":
-        return <CheckCircle className="h-4 w-4 text-green-600" />;
+        return <CheckCircle className='h-4 w-4 text-green-600' />;
       case "demo":
-        return <AlertTriangle className="h-4 w-4 text-yellow-600" />;
+        return <AlertTriangle className='h-4 w-4 text-yellow-600' />;
       case "error":
-        return <XCircle className="h-4 w-4 text-red-600" />;
+        return <XCircle className='h-4 w-4 text-red-600' />;
       default:
-        return <div className="h-2 w-2 bg-gray-400 rounded-full"></div>;
+        return <div className='h-2 w-2 bg-gray-400 rounded-full'></div>;
     }
   };
 
@@ -70,29 +73,27 @@ export function ApiStatusCard() {
 
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium">API Status</CardTitle>
+      <CardHeader className='pb-2'>
+        <CardTitle className='text-sm font-medium'>API Status</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-3">
-          <div className="flex items-center space-x-2">
+        <div className='space-y-3'>
+          <div className='flex items-center space-x-2'>
             {getStatusIcon()}
-            <Badge className={getStatusColor()}>
-              {getStatusText()}
-            </Badge>
+            <Badge className={getStatusColor()}>{getStatusText()}</Badge>
           </div>
-          
+
           {apiStatus.status !== "connected" && (
             <Alert>
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription className="text-sm">
+              <AlertTriangle className='h-4 w-4' />
+              <AlertDescription className='text-sm'>
                 {apiStatus.message}
               </AlertDescription>
             </Alert>
           )}
-          
+
           {apiStatus.last_update && (
-            <p className="text-xs text-muted-foreground">
+            <p className='text-xs text-muted-foreground'>
               Last update: {new Date(apiStatus.last_update).toLocaleString()}
             </p>
           )}

@@ -20,10 +20,10 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { useShinyInput, useShinyOutput } from "@posit/shiny-react";
 import { format } from "date-fns";
 import { CalendarIcon, ChevronDown, Filter } from "lucide-react";
 import React from "react";
-import { useShinyInput, useShinyOutput } from "shiny-react";
 
 const DEFAULT_DATE_RANGE = 30;
 
