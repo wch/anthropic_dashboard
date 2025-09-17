@@ -1,29 +1,49 @@
 import chokidar from "chokidar";
 import * as esbuild from "esbuild";
 import tailwindPlugin from "esbuild-plugin-tailwindcss";
+import { existsSync } from "node:fs";
 
 const production = process.argv.includes("--production");
 const watch = process.argv.includes("--watch");
 const metafile = process.argv.includes("--metafile");
 
+const buildOptions: esbuild.BuildOptions = {
+  entryPoints: ["srcts/main.tsx"],
+  bundle: true,
+  format: "esm",
+  minify: production,
+  sourcemap: production ? undefined : "linked",
+  sourcesContent: true,
+  alias: {
+    react: "react",
+  },
+  logLevel: "warning",
+  metafile: metafile,
+  plugins: [tailwindPlugin()],
+};
+
 async function main() {
-  const buildmap = {
-    py: esbuild.context({
-      entryPoints: ["srcts/main.tsx"],
+  const buildmap: Record<string, Promise<esbuild.BuildContext>> = {};
+
+  // Only add build context if the directory exists
+  if (existsSync("r")) {
+    buildmap.r = esbuild.context({
+      ...buildOptions,
+      outfile: "r/www/main.js",
+    });
+  }
+
+  if (existsSync("py")) {
+    buildmap.py = esbuild.context({
+      ...buildOptions,
       outfile: "py/www/main.js",
-      bundle: true,
-      format: "esm",
-      minify: production,
-      sourcemap: production ? undefined : "linked",
-      sourcesContent: true,
-      alias: {
-        react: "react",
-      },
-      logLevel: "info",
-      metafile: metafile,
-      plugins: [tailwindPlugin()],
-    }),
-  };
+    });
+
+    if (Object.keys(buildmap).length === 0) {
+      console.log("No build targets found. Need r/ or py/ directory. Exiting.");
+      process.exit(0);
+    }
+  }
 
   if (watch) {
     // Use chokidar for watching instead of esbuild's watch, because esbuild's
@@ -37,7 +57,6 @@ async function main() {
     const watchPaths = ["srcts/", "tailwind.config.js"];
 
     const watcher = chokidar.watch(watchPaths, {
-      ignored: ["**/node_modules/**", "**/dist/**", "**/*.d.ts"],
       persistent: true,
       ignoreInitial: true,
     });
@@ -81,9 +100,7 @@ async function main() {
         .then(async (context: esbuild.BuildContext) => {
           console.log(`Building .js bundle for ${target} target...`);
           await context.rebuild();
-          console.log(
-            `✓ Successfully built ${target === "py" ? "py/www/main.js" : "r/www/main.js"}`
-          );
+          console.log(`✓ Successfully built ${target}/www/main.js`);
           await context.dispose();
         })
         .catch((e) => {
