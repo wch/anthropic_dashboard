@@ -364,17 +364,46 @@ def server(input: Inputs, output: Outputs, session: Session):
                 if hasattr(input, "filter_model") and input.filter_model() is not None
                 else "all"
             )
+            start_date = (
+                input.date_start()
+                if hasattr(input, "date_start") and input.date_start() is not None
+                else default_start
+            )
+            end_date = (
+                input.date_end()
+                if hasattr(input, "date_end") and input.date_end() is not None
+                else default_end
+            )
         except:
             workspace_filter = "all"
             api_key_filter = "all"
             model_filter = "all"
+            start_date = default_start
+            end_date = default_end
 
         print(
-            f"Applying filters - workspace: {workspace_filter}, api_key: {api_key_filter}, model: {model_filter}"
+            f"Applying filters - workspace: {workspace_filter}, api_key: {api_key_filter}, model: {model_filter}, date: {start_date} to {end_date}"
         )
 
         # Apply filters
         filtered_df = df.copy()
+
+        # Apply date range filter
+        if "date" in filtered_df.columns:
+            # Convert date strings to datetime for filtering
+            filtered_df["date_dt"] = pd.to_datetime(filtered_df["date"])
+            start_dt = datetime.fromisoformat(
+                start_date.replace("Z", "+00:00")
+            ).replace(tzinfo=None)
+            end_dt = datetime.fromisoformat(end_date.replace("Z", "+00:00")).replace(
+                tzinfo=None
+            )
+            filtered_df = filtered_df[
+                (filtered_df["date_dt"] >= start_dt)
+                & (filtered_df["date_dt"] <= end_dt)
+            ]
+            # Remove the temporary datetime column
+            filtered_df = filtered_df.drop(columns=["date_dt"])
 
         if workspace_filter != "all":
             filtered_df = filtered_df[filtered_df["workspace_id"] == workspace_filter]
@@ -520,17 +549,46 @@ def server(input: Inputs, output: Outputs, session: Session):
                 if hasattr(input, "filter_model") and input.filter_model() is not None
                 else "all"
             )
+            start_date = (
+                input.date_start()
+                if hasattr(input, "date_start") and input.date_start() is not None
+                else default_start
+            )
+            end_date = (
+                input.date_end()
+                if hasattr(input, "date_end") and input.date_end() is not None
+                else default_end
+            )
         except:
             workspace_filter = "all"
             api_key_filter = "all"
             model_filter = "all"
+            start_date = default_start
+            end_date = default_end
 
         print(
-            f"Applying cost filters - workspace: {workspace_filter}, api_key: {api_key_filter}, model: {model_filter}"
+            f"Applying cost filters - workspace: {workspace_filter}, api_key: {api_key_filter}, model: {model_filter}, date: {start_date} to {end_date}"
         )
 
         # Apply filters
         filtered_df = df.copy()
+
+        # Apply date range filter
+        if "date" in filtered_df.columns:
+            # Convert date strings to datetime for filtering
+            filtered_df["date_dt"] = pd.to_datetime(filtered_df["date"])
+            start_dt = datetime.fromisoformat(
+                start_date.replace("Z", "+00:00")
+            ).replace(tzinfo=None)
+            end_dt = datetime.fromisoformat(end_date.replace("Z", "+00:00")).replace(
+                tzinfo=None
+            )
+            filtered_df = filtered_df[
+                (filtered_df["date_dt"] >= start_dt)
+                & (filtered_df["date_dt"] <= end_dt)
+            ]
+            # Remove the temporary datetime column
+            filtered_df = filtered_df.drop(columns=["date_dt"])
 
         if workspace_filter != "all":
             filtered_df = filtered_df[filtered_df["workspace_id"] == workspace_filter]
