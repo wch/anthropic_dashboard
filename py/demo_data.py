@@ -8,7 +8,7 @@ from data_types import UsageDataRow, WorkspaceData, ApiKeyData, CostDataRow
 def generate_demo_usage_data(granularity: str = "1d") -> pd.DataFrame:
     """Generate demo usage data when API is unavailable"""
     end_date = datetime.now()
-    start_date = end_date - timedelta(days=7)
+    start_date = end_date - timedelta(days=30)
 
     rows: list[UsageDataRow] = []
     models = ["claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"]
@@ -34,7 +34,7 @@ def generate_demo_usage_data(granularity: str = "1d") -> pd.DataFrame:
             current_time += timedelta(hours=1)
     else:
         # Generate daily data points (default behavior)
-        for i in range(7):
+        for i in range(30):
             current_date = (start_date + timedelta(days=i)).strftime("%Y-%m-%d")
             time_points.append(current_date)
 
@@ -202,7 +202,7 @@ def generate_demo_cost_data(granularity: str = "1d") -> pd.DataFrame:
     so we ignore the granularity parameter and always generate daily data.
     """
     end_date = datetime.now()
-    start_date = end_date - timedelta(days=7)
+    start_date = end_date - timedelta(days=30)
 
     rows: list[CostDataRow] = []
     models = ["claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"]
@@ -220,7 +220,7 @@ def generate_demo_cost_data(granularity: str = "1d") -> pd.DataFrame:
 
     # Cost reports are always daily - ignore granularity parameter
     time_points = []
-    for i in range(7):
+    for i in range(30):
         current_date = (start_date + timedelta(days=i)).strftime("%Y-%m-%d")
         time_points.append(current_date)
 
@@ -244,7 +244,7 @@ def generate_demo_cost_data(granularity: str = "1d") -> pd.DataFrame:
                     )
                     for api_key in workspace_api_keys:
                         # Cost reports are always daily amounts
-                        amount = np.random.uniform(0.50, 15.00)
+                        amount = np.random.uniform(0.50, 7.50)
 
                         row: CostDataRow = {
                             "date": time_point,
